@@ -11,6 +11,17 @@
 #define OK (0)
 #define ERROR (-1)
 #define UNINITIALIZED (-100)
+#define MAX_BASELINES (28)
+
+typedef struct __attribute__((packed)) codehDef {
+  
+  char v_name[12];/* label 			*/
+  short  icode	; /* index for a code word	*/
+  char code[26]	; /* the code word		*/
+  short ncode	; /* # chars in code word	*/
+  
+} codehDef;
+/* the size of codeh is 42 bytes */
 
 typedef struct __attribute__((packed)) sphDef {
   int 	sphid     ; /* spectrum id #              */
@@ -62,6 +73,7 @@ typedef struct chunkSpec {
   int startChan;
   int endChan;
   int nAve;
+  int iband;
   struct chunkSpec *next;
 } chunkSpec;
 
@@ -81,11 +93,14 @@ void printUsage(char *name) {
 int main (int argc, char **argv)
 {
   int i, inFId, nRead, outFId, nSynth, justRegrid, eChan, sChan;
-  int schInFId, schOutFId, lastInhid, schDataSize;
+  int newBandCounter = 0;
+  int schInFId, schOutFId, lastInhid, schDataSize, codesInFId, codesOutFId;
   int outputDefault = FALSE;
   int gotInput = FALSE;
   int gotOutput = FALSE;
   int header[2];
+  int nSynthSize = 0;
+  int newDataSize = 0;
   int newHeader[2], newSize;
   int outPtr = 0;
   short *data = NULL;
@@ -95,15 +110,14 @@ int main (int argc, char **argv)
   char shellCommand[1000], fileName[1000];
   chunkSpec *newChunk = NULL;
   chunkSpec *lastChunk = NULL;
-  sphDef newSp;
+  codehDef oldCode;
+  sphDef oldSp, newSp;
 
-  while ((i = getopt(argc, argv, "i:o:")) != -1) {
+  while ((i = getopt(argc, argv, "di:o:")) != -1) {
     switch (i) {
-      /*
     case 'd':
       outputDefault = TRUE;
       break;
-      */
     case 'i':
       gotInput = TRUE;
       inDir = optarg;
@@ -128,12 +142,28 @@ int main (int argc, char **argv)
     justRegrid = TRUE;
   else
     justRegrid = FALSE;
-  /* printf("justRegrid = %d\n", justRegrid); */
-  if (!justRegrid) {
-    fprintf(stderr, "Only regridding is supported at this time - aborting.\n");
-    exit(0);
+  if (outputDefault) {
+    /* Define two "new" chunks which are just the raw SWARM chunks without any changes */
+    for (i = 49; i <= 50; i++) {
+      newChunk = malloc(sizeof(*newChunk));
+      if (newChunk == NULL) {
+	perror("newChunk malloc");
+	exit(ERROR);
+      }
+      newChunk->sourceChunk = i;
+      newChunk->startChan = 0;
+      newChunk->endChan = 16383;
+      newChunk->nAve = 1;
+      newChunk->iband = 49+newBandCounter++;
+      newChunk->next = NULL;
+      if (newChunkList == NULL)
+	newChunkList = newChunk;
+      else
+	lastChunk->next = newChunk;
+      lastChunk = newChunk;    
+    }
   }
-  for (i = 0; i < argc-optind; i++) {
+  for (i = 0; i < nSynth; i++) {
     int chunk, n, nRead;
 
     nRead = sscanf(argv[i+optind], "%d:%d:%d:%d", &chunk, &sChan, &eChan, &n);
@@ -144,7 +174,7 @@ int main (int argc, char **argv)
     }
     if ((chunk < 49) || (chunk > 50)) {
       fprintf(stderr, "Error in new chunk spcification #%d\n", i+1);
-      fprintf(stderr, "\"%s\" is an invalid chunk specifier - %d must be 49 or 50\n",
+      fprintf(stderr, "\"%s\" is an invalid chunk specifier - input chunk (%d) must be 49 or 50\n",
 	      argv[i+optind], chunk);
       exit(ERROR);
     }
@@ -188,6 +218,7 @@ int main (int argc, char **argv)
     newChunk->startChan = sChan;
     newChunk->endChan = eChan;
     newChunk->nAve = n;
+    newChunk->iband = 49+newBandCounter++;
     newChunk->next = NULL;
     if (newChunkList == NULL)
       newChunkList = newChunk;
@@ -195,6 +226,9 @@ int main (int argc, char **argv)
       lastChunk->next = newChunk;
     lastChunk = newChunk;
   }
+  if (outputDefault)
+    nSynth += 2;
+
   /* Make the destination directory */
   if (mkdir(outDir, 0777)) {
     perror("making output diectory");
@@ -211,9 +245,11 @@ int main (int argc, char **argv)
   printf("\tbl_read\n");
   sprintf(shellCommand, "cp %s/bl_read %s/", inDir, outDir);
   system(shellCommand);
-  printf("\tcodes_read\n");
-  sprintf(shellCommand, "cp %s/codes_read %s/", inDir, outDir);
-  system(shellCommand);
+  if (justRegrid) {
+    printf("\tcodes_read\n");
+    sprintf(shellCommand, "cp %s/codes_read %s/", inDir, outDir);
+    system(shellCommand);
+  }
   printf("\tcodeVersions\n");
   sprintf(shellCommand, "cp %s/codeVersions %s/", inDir, outDir);
   system(shellCommand);
@@ -241,6 +277,62 @@ int main (int argc, char **argv)
   /* Now make the new files with the additional chunks */
   printf("Making the files which need modification\n");
 
+  if (!justRegrid) {
+    int haveSeenBand = FALSE;
+    int haveWrittenNewCodes = FALSE;
+    int lastCode = -1;
+
+    /* printf("\tAdding new codes\n"); */
+    sprintf(fileName, "%s/codes_read", inDir);
+    codesInFId = open(fileName, O_RDONLY);
+    if (codesInFId < 0) {
+      perror("Open of codes_read");
+      exit(ERROR);
+    }
+    sprintf(fileName, "%s/codes_read", outDir);
+    codesOutFId = open(fileName, O_WRONLY|O_CREAT);
+    if (codesOutFId < 0) {
+      perror("Open of codes_read (new)");
+      exit(ERROR);
+    }
+    nRead = sizeof(oldCode);
+    while (nRead == sizeof(oldCode)) {
+      nRead = read(codesInFId, &oldCode, sizeof(oldCode));
+      if (nRead == sizeof(oldCode)) {
+	/*
+	printf("\tv_name = \"%s\", icode = %d, code = \"%s\", ncode = %d\n",
+	       oldCode.v_name, oldCode.icode, oldCode.code, oldCode.ncode);
+	*/
+	if (!haveWrittenNewCodes) {
+	  if ((!haveSeenBand) && (!strcmp(oldCode.v_name, "band")) && (oldCode.code[0] == 's')) {
+	    /* printf("OK, here come the bands\n"); */
+	    haveSeenBand = TRUE;
+	  }
+	  if ((haveSeenBand) && (strcmp(oldCode.v_name, "band"))) {
+	    int i;
+	    codehDef newCode;
+
+	    /* printf("Here come the NEW bands (%d)\n", lastCode); */
+	    bcopy(&oldCode, &newCode, sizeof(newCode));
+	    sprintf(newCode.v_name, "band");
+	    for (i = lastCode+1; i < lastCode+1+(nSynth-2); i++) {
+	      sprintf(newCode.code, "s%02d", i);
+	      newCode.icode = newCode.ncode = i;
+	      /*
+	      printf("\t\tv_name = \"%s\", icode = %d, code = \"%s\", ncode = %d\n",
+		     newCode.v_name, newCode.icode, newCode.code, newCode.ncode);
+	      */
+	      write(codesOutFId, &newCode, sizeof(newCode));
+	    }
+	    haveWrittenNewCodes = TRUE;
+	  }
+	}
+	write(codesOutFId, &oldCode, sizeof(oldCode));
+	lastCode = oldCode.icode;
+      }
+    }
+  }
+
   sprintf(fileName, "%s/sch_read", inDir);
   schInFId = open(fileName, O_RDONLY);
   if (schInFId < 0) {
@@ -267,28 +359,46 @@ int main (int argc, char **argv)
   }
   
   lastInhid = schDataSize = UNINITIALIZED;
-  nRead = sizeof(newSp);
-  while (nRead == sizeof(newSp)) {
+  nRead = sizeof(oldSp);
+  nSynthSize = 0;
+  if (!justRegrid) {
+    /* Calculate how much larger than the input sch_read buffer the output sch_read buffer will be */
+    chunkSpec *ptr;
+    
+    ptr = newChunkList;
+    
+    while (ptr != NULL) {
+      nSynthSize += 2*MAX_BASELINES*(4*(1 + (1 + ptr->endChan - ptr->startChan)/ptr->nAve) + 2);
+      ptr = ptr->next;
+    }
+    nSynthSize *= 2; /* Paranoia */
+  }
+  while (nRead == sizeof(oldSp)) {
     int found = FALSE;
     int factor = 1;
 
-    nRead = read(inFId, &newSp, sizeof(newSp));
-    if (nRead == sizeof(newSp)) {
-      if (newSp.inhid != lastInhid) {
+    nRead = read(inFId, &oldSp, sizeof(oldSp));
+    if (nRead == sizeof(oldSp)) {
+      if (oldSp.inhid != lastInhid) {
 	int schNRead;
 
-	if ((newSp.inhid % 100) == 0)
-	  printf("Processing scan: %d\n", newSp.inhid);
+	if ((oldSp.inhid % 100) == 0)
+	  printf("Processing scan: %d\n", oldSp.inhid);
 	if (data != NULL) {
 	  /* Not the first record - need to write out last scan's data */
 
 	  newHeader[1] = outPtr*sizeof(short);
 	  write(schOutFId, &newHeader[0], 2*sizeof(int));
+	  if (outPtr*sizeof(short) > newDataSize) {
+	    fprintf(stderr, "Output buffer overflow (2): max: %d, now: %d - abort\n", newDataSize, outPtr);
+	    exit(ERROR);
+	  }
 	  write(schOutFId, &newData[0], outPtr*sizeof(short));
 	}
 	schNRead = read(schInFId, &header[0], 2*sizeof(int));
 	if (schNRead != 2*sizeof(int)) {
 	  fprintf(stderr, "Only got %d bytes from sch_read - should have gotten %ld\n", schNRead, 2*sizeof(int));
+	  exit(ERROR);
 	}
 	if (schDataSize == UNINITIALIZED) {
 	  /* printf("sch data size is %d\n", header[1]); */
@@ -297,8 +407,8 @@ int main (int argc, char **argv)
 	  fprintf(stderr, "data section size change - was %d, is now %d\n", schDataSize, header[1]);
 	  exit(ERROR);
 	}
-	if (newSp.inhid != header[0]) {
-	  fprintf(stderr, "sp thinks inhid is %d, sch thinks inhid = %d - abort\n", newSp.inhid, header[0]);
+	if (oldSp.inhid != header[0]) {
+	  fprintf(stderr, "sp thinks inhid is %d, sch thinks inhid = %d - abort\n", oldSp.inhid, header[0]);
 	  exit(ERROR);
 	}
 	if (data == NULL) {
@@ -307,7 +417,8 @@ int main (int argc, char **argv)
 	    perror("malloc of data");
 	    exit(ERROR);
 	  }
-	  newData = (short *)malloc(schDataSize);
+	  newDataSize = schDataSize + nSynthSize;
+	  newData = (short *)malloc(newDataSize);
 	  if (newData == NULL) {
 	    perror("malloc of newData");
 	    exit(ERROR);
@@ -322,72 +433,79 @@ int main (int argc, char **argv)
 		  schDataSize, schNRead);
 	  exit(ERROR);
 	}
-	lastInhid = newSp.inhid;
+	lastInhid = oldSp.inhid;
       }
       found = FALSE;
-      if ((newSp.iband == 49) || (newSp.iband == 50)) {
+      if ((oldSp.iband == 49) || (oldSp.iband == 50)) {
 	chunkSpec *ptr;
 
 	ptr = newChunkList;
 
-	while ((ptr != NULL) && (!found)) {
-	  if (newSp.iband == ptr->sourceChunk) {
+	while (ptr != NULL) {
+	  if (oldSp.iband == ptr->sourceChunk) {
+	    int i, j, oldPtr;
+	    double realSum, imagSum, real, imag;
+	    
 	    found = TRUE;
 	    sChan = ptr->startChan;
 	    eChan = ptr->endChan;
 	    factor = ptr->nAve;
-	  } else
-	    ptr = ptr->next;
+	    
+	    /* Regrid the chunk! */
+	    
+	    oldPtr = oldSp.dataoff/2;
+	    newData[outPtr] = data[oldPtr];
+	    /* printf("\tReducing the resolution of band %d by a factor of %d\n", oldSp.iband, factor); */
+	    bcopy(&oldSp, &newSp, sizeof(newSp));
+	    newSp.dataoff = outPtr*2;
+	    newSp.vres *= factor;
+	    if ((sChan != 0) || (eChan != (oldSp.nch-1))) {
+	      double n, f, fr, fs, fe;
+	      
+	      f = oldSp.fsky;
+	      fr = oldSp.fres/1.0e3;
+	      n = (double)oldSp.nch;
+	      fs = f - fr*(n/2.0 - (double)sChan);
+	      fe = f - fr*(n/2.0 - (double)eChan);
+	      newSp.fsky = (fs + fe)/2.0;
+	    }
+	    newSp.fres *= factor;
+	    newSp.iband = ptr->iband;
+	    outPtr++;
+	    for (i = sChan/factor; i < (eChan+1)/factor; i++) {
+	      realSum = imagSum = 0.0;
+	      for (j = 0; j < factor; j++) {
+		real = (double)data[1 + oldPtr + 2*j + i*factor*2];
+		imag = (double)data[2 + oldPtr + 2*j + i*factor*2];
+		realSum += real;
+		imagSum += imag;
+	      }
+	      realSum /= (double)factor;
+	      imagSum /= (double)factor;
+	      newData[outPtr++] = (short)realSum;
+	      newData[outPtr++] = (short)imagSum;
+	    }
+	    newSp.nch = (oldSp.nch - sChan - ((oldSp.nch-1) - eChan))/factor;
+	    write(outFId, &newSp, sizeof(newSp));
+	  }
+	  ptr = ptr->next;
 	}
       }
-
       if (!found) {
 	/* Nothing needs to be done to this band - just pass it through */
-	bcopy(&data[newSp.dataoff/2], &newData[outPtr], 4*newSp.nch + 2);
-	newSp.dataoff = outPtr*2;
-	outPtr +=  2*newSp.nch + 1;
-      } else {
-	/* Regrid the chunk! */
-	int i, j, oldPtr;
-	double realSum, imagSum, real, imag;
-
-	oldPtr = newSp.dataoff/2;
-	newData[outPtr] = data[oldPtr];
-	/* printf("\tReducing the resolution of band %d by a factor of %d\n", newSp.iband, factor); */
-	newSp.dataoff = outPtr*2;
-	newSp.vres *= factor;
-	if ((sChan != 0) || (eChan != (newSp.nch-1))) {
-	  double n, f, fr, fs, fe;
-
-	  f = newSp.fsky;
-	  fr = newSp.fres/1.0e3;
-	  n = (double)newSp.nch;
-	  fs = f - fr*(n/2.0 - (double)sChan);
-	  fe = f - fr*(n/2.0 - (double)eChan);
-	  newSp.fsky = (fs + fe)/2.0;
-	}
-	newSp.fres *= factor;
-	outPtr++;
-	for (i = sChan/factor; i < (eChan+1)/factor; i++) {
-	  realSum = imagSum = 0.0;
-	  for (j = 0; j < factor; j++) {
-	    real = (double)data[1 + oldPtr + 2*j + i*factor*2];
-	    imag = (double)data[2 + oldPtr + 2*j + i*factor*2];
-	    realSum += real;
-	    imagSum += imag;
-	  }
-	  realSum /= (double)factor;
-	  imagSum /= (double)factor;
-	  newData[outPtr++] = (short)realSum;
-	  newData[outPtr++] = (short)imagSum;
-	}
-	newSp.nch = (newSp.nch - sChan - ((newSp.nch-1) - eChan))/factor;
+	bcopy(&data[oldSp.dataoff/2], &newData[outPtr], 4*oldSp.nch + 2);
+	oldSp.dataoff = outPtr*2;
+	outPtr +=  2*oldSp.nch + 1;
+	write(outFId, &oldSp, sizeof(oldSp));
       }
-      write(outFId, &newSp, sizeof(newSp));
     }
   }
   newHeader[1] = outPtr*sizeof(short);
   write(schOutFId, &newHeader[0], 2*sizeof(int));
+  if (outPtr*sizeof(short) > newDataSize) {
+    fprintf(stderr, "Output buffer overflow (2): max: %d, now: %d - abort\n", newDataSize, outPtr);
+    exit(ERROR);
+  }
   write(schOutFId, &newData[0], outPtr*sizeof(short));
   sprintf(shellCommand, "chmod 666 %s/*", outDir);
   system(shellCommand);
