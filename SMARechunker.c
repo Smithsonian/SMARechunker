@@ -282,7 +282,7 @@ int main (int argc, char **argv)
     int haveWrittenNewCodes = FALSE;
     int lastCode = -1;
 
-    /* printf("\tAdding new codes\n"); */
+    printf("\tAdding new codes\n");
     sprintf(fileName, "%s/codes_read", inDir);
     codesInFId = open(fileName, O_RDONLY);
     if (codesInFId < 0) {
@@ -373,6 +373,7 @@ int main (int argc, char **argv)
     }
     nSynthSize *= 2; /* Paranoia */
   }
+  printf("\tsp_read and sch_read\n");
   while (nRead == sizeof(oldSp)) {
     int found = FALSE;
     int factor = 1;
@@ -444,7 +445,8 @@ int main (int argc, char **argv)
 	while (ptr != NULL) {
 	  if (oldSp.iband == ptr->sourceChunk) {
 	    int i, j, oldPtr;
-	    double realSum, imagSum, real, imag;
+	    short *tData;
+	    double realSum, imagSum;
 	    
 	    found = TRUE;
 	    sChan = ptr->startChan;
@@ -472,13 +474,12 @@ int main (int argc, char **argv)
 	    newSp.fres *= factor;
 	    newSp.iband = ptr->iband;
 	    outPtr++;
+	    tData = &data[1+oldPtr];
 	    for (i = sChan/factor; i < (eChan+1)/factor; i++) {
 	      realSum = imagSum = 0.0;
 	      for (j = 0; j < factor; j++) {
-		real = (double)data[1 + oldPtr + 2*j + i*factor*2];
-		imag = (double)data[2 + oldPtr + 2*j + i*factor*2];
-		realSum += real;
-		imagSum += imag;
+		realSum += (double)*tData++;
+		imagSum += (double)*tData++;
 	      }
 	      realSum /= (double)factor;
 	      imagSum /= (double)factor;
