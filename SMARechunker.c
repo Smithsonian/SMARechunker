@@ -8,7 +8,6 @@
 
 #define TRUE  (1)
 #define FALSE (0)
-#define OK (0)
 #define ERROR (-1)
 #define UNINITIALIZED (-100)
 #define MAX_BASELINES (28)
@@ -137,7 +136,6 @@ int main (int argc, char **argv)
     printUsage(argv[0]);
   } else
     nSynth = argc-optind;
-  /* printf("Will produce %d synthetic chunks\n", nSynth); */
   if (!outputDefault && (nSynth < 3))
     justRegrid = TRUE;
   else
@@ -299,29 +297,19 @@ int main (int argc, char **argv)
     while (nRead == sizeof(oldCode)) {
       nRead = read(codesInFId, &oldCode, sizeof(oldCode));
       if (nRead == sizeof(oldCode)) {
-	/*
-	printf("\tv_name = \"%s\", icode = %d, code = \"%s\", ncode = %d\n",
-	       oldCode.v_name, oldCode.icode, oldCode.code, oldCode.ncode);
-	*/
 	if (!haveWrittenNewCodes) {
 	  if ((!haveSeenBand) && (!strcmp(oldCode.v_name, "band")) && (oldCode.code[0] == 's')) {
-	    /* printf("OK, here come the bands\n"); */
 	    haveSeenBand = TRUE;
 	  }
 	  if ((haveSeenBand) && (strcmp(oldCode.v_name, "band"))) {
 	    int i;
 	    codehDef newCode;
 
-	    /* printf("Here come the NEW bands (%d)\n", lastCode); */
 	    bcopy(&oldCode, &newCode, sizeof(newCode));
 	    sprintf(newCode.v_name, "band");
 	    for (i = lastCode+1; i < lastCode+1+(nSynth-2); i++) {
 	      sprintf(newCode.code, "s%02d", i);
 	      newCode.icode = newCode.ncode = i;
-	      /*
-	      printf("\t\tv_name = \"%s\", icode = %d, code = \"%s\", ncode = %d\n",
-		     newCode.v_name, newCode.icode, newCode.code, newCode.ncode);
-	      */
 	      write(codesOutFId, &newCode, sizeof(newCode));
 	    }
 	    haveWrittenNewCodes = TRUE;
@@ -402,7 +390,6 @@ int main (int argc, char **argv)
 	  exit(ERROR);
 	}
 	if (schDataSize == UNINITIALIZED) {
-	  /* printf("sch data size is %d\n", header[1]); */
 	  schDataSize = header[1];
 	} else if (schDataSize != header[1]) {
 	  fprintf(stderr, "data section size change - was %d, is now %d\n", schDataSize, header[1]);
@@ -457,9 +444,8 @@ int main (int argc, char **argv)
 	    
 	    oldPtr = oldSp.dataoff/2;
 	    newData[outPtr] = data[oldPtr];
-	    /* printf("\tReducing the resolution of band %d by a factor of %d\n", oldSp.iband, factor); */
 	    bcopy(&oldSp, &newSp, sizeof(newSp));
-	    newSp.dataoff = outPtr*2;
+	    newSp.dataoff = 2*outPtr++;
 	    newSp.vres *= factor;
 	    if ((sChan != 0) || (eChan != (oldSp.nch-1))) {
 	      double n, f, fr, fs, fe;
@@ -473,7 +459,6 @@ int main (int argc, char **argv)
 	    }
 	    newSp.fres *= factor;
 	    newSp.iband = ptr->iband;
-	    outPtr++;
 	    tData = &data[1+oldPtr];
 	    for (i = sChan/factor; i < (eChan+1)/factor; i++) {
 	      realSum = imagSum = 0.0;
