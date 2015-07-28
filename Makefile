@@ -1,2 +1,2 @@
 SMARechunker: SMARechunker.c Makefile
-	gcc -O3 -Wall -g -o SMARechunker SMARechunker.c
+	gcc -O3 -funsafe-loop-optimizations -Wall -o SMARechunker SMARechunker.c
