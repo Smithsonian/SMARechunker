@@ -305,7 +305,7 @@ int main (int argc, char **argv)
 	    int i;
 	    codehDef newCode;
 
-	    bcopy(&oldCode, &newCode, sizeof(newCode));
+	    memcpy(&newCode, &oldCode, sizeof(newCode));
 	    sprintf(newCode.v_name, "band");
 	    for (i = lastCode+1; i < lastCode+1+(nSynth-2); i++) {
 	      sprintf(newCode.code, "s%02d", i);
@@ -431,9 +431,8 @@ int main (int argc, char **argv)
 
 	while (ptr != NULL) {
 	  if (oldSp.iband == ptr->sourceChunk) {
-	    int i, j, oldPtr;
+	    int i, j, oldPtr, realIntSum, imagIntSum;
 	    short *tData;
-	    double realSum, imagSum;
 	    
 	    found = TRUE;
 	    sChan = ptr->startChan;
@@ -444,7 +443,7 @@ int main (int argc, char **argv)
 	    
 	    oldPtr = oldSp.dataoff/2;
 	    newData[outPtr] = data[oldPtr];
-	    bcopy(&oldSp, &newSp, sizeof(newSp));
+	    memcpy(&newSp, &oldSp, sizeof(newSp));
 	    newSp.dataoff = 2*outPtr++;
 	    newSp.vres *= factor;
 	    if ((sChan != 0) || (eChan != (oldSp.nch-1))) {
@@ -461,15 +460,13 @@ int main (int argc, char **argv)
 	    newSp.iband = ptr->iband;
 	    tData = &data[1+oldPtr];
 	    for (i = sChan/factor; i < (eChan+1)/factor; i++) {
-	      realSum = imagSum = 0.0;
+	      realIntSum = imagIntSum = 0;
 	      for (j = 0; j < factor; j++) {
-		realSum += (double)*tData++;
-		imagSum += (double)*tData++;
+		realIntSum += *tData++;
+		imagIntSum += *tData++;
 	      }
-	      realSum /= (double)factor;
-	      imagSum /= (double)factor;
-	      newData[outPtr++] = (short)realSum;
-	      newData[outPtr++] = (short)imagSum;
+	      newData[outPtr++] = (short)( ((float)realIntSum) / ((float)factor) );
+	      newData[outPtr++] = (short)( ((float)imagIntSum) / ((float)factor) );
 	    }
 	    newSp.nch = (oldSp.nch - sChan - ((oldSp.nch-1) - eChan))/factor;
 	    write(outFId, &newSp, sizeof(newSp));
@@ -479,7 +476,7 @@ int main (int argc, char **argv)
       }
       if (!found) {
 	/* Nothing needs to be done to this band - just pass it through */
-	bcopy(&data[oldSp.dataoff/2], &newData[outPtr], 4*oldSp.nch + 2);
+	memcpy(&newData[outPtr], &data[oldSp.dataoff/2], 4*oldSp.nch + 2);
 	oldSp.dataoff = outPtr*2;
 	outPtr +=  2*oldSp.nch + 1;
 	write(outFId, &oldSp, sizeof(oldSp));
