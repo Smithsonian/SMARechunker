@@ -461,9 +461,51 @@ int main (int argc, char **argv)
 	    tData = &data[1+oldPtr];
 	    for (i = sChan/factor; i < (eChan+1)/factor; i++) {
 	      realIntSum = imagIntSum = 0;
-	      for (j = 0; j < factor; j++) {
+	      /*
+		This somewhat ugly switch is used to allow the compiler to know the size of the loop
+		 for small values of "factor".   That in turn allows the compiler to unroll the loop
+		 in these cases.
+	       */
+	      switch (factor) {
+	      case 1:
 		realIntSum += *tData++;
 		imagIntSum += *tData++;
+		break;
+	      case 2:
+		for (j = 0; j < 2; j++) {
+		  realIntSum += *tData++;
+		  imagIntSum += *tData++;
+		}
+		break;
+	      case 4:
+		for (j = 0; j < 4; j++) {
+		  realIntSum += *tData++;
+		  imagIntSum += *tData++;
+		}
+		break;
+	      case 8:
+		for (j = 0; j < 8; j++) {
+		  realIntSum += *tData++;
+		  imagIntSum += *tData++;
+		}
+		break;
+	      case 16:
+		for (j = 0; j < 16; j++) {
+		  realIntSum += *tData++;
+		  imagIntSum += *tData++;
+		}
+		break;
+	      case 32:
+		for (j = 0; j < 32; j++) {
+		  realIntSum += *tData++;
+		  imagIntSum += *tData++;
+		}
+		break;
+	      default:
+		for (j = 0; j < factor; j++) {
+		  realIntSum += *tData++;
+		  imagIntSum += *tData++;
+		}
 	      }
 	      newData[outPtr++] = (short)( ((float)realIntSum) / ((float)factor) );
 	      newData[outPtr++] = (short)( ((float)imagIntSum) / ((float)factor) );
