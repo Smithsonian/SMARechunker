@@ -100,10 +100,12 @@ int main (int argc, char **argv)
   int header[2];
   int nSynthSize = 0;
   int newDataSize = 0;
-  int newHeader[2], newSize;
+  int *newHeader = NULL;
+  int newSize;
   int outPtr = 0;
   short *data = NULL;
   short *newData = NULL;
+  short *bigData = NULL;
   char *inDir = NULL;
   char *outDir = NULL;
   char shellCommand[1000], fileName[1000];
@@ -377,12 +379,11 @@ int main (int argc, char **argv)
 	  /* Not the first record - need to write out last scan's data */
 
 	  newHeader[1] = outPtr*sizeof(short);
-	  write(schOutFId, &newHeader[0], 2*sizeof(int));
 	  if (outPtr*sizeof(short) > newDataSize) {
 	    fprintf(stderr, "Output buffer overflow (2): max: %d, now: %d - abort\n", newDataSize, outPtr);
 	    exit(ERROR);
 	  }
-	  write(schOutFId, &newData[0], outPtr*sizeof(short));
+	  write(schOutFId, &bigData[0], outPtr*sizeof(short) + 2*sizeof(int));
 	}
 	schNRead = read(schInFId, &header[0], 2*sizeof(int));
 	if (schNRead != 2*sizeof(int)) {
@@ -406,11 +407,13 @@ int main (int argc, char **argv)
 	    exit(ERROR);
 	  }
 	  newDataSize = schDataSize + nSynthSize;
-	  newData = (short *)malloc(newDataSize);
-	  if (newData == NULL) {
-	    perror("malloc of newData");
+	  bigData = (short *)malloc(newDataSize + 2*sizeof(int));
+	  if (bigData == NULL) {
+	    perror("malloc of bigData");
 	    exit(ERROR);
 	  }
+	  newData = &bigData[4];
+	  newHeader = (int *)(&bigData[0]);
 	}
 	newHeader[0] = header[0];
 	newSize = outPtr = 0;
@@ -526,12 +529,11 @@ int main (int argc, char **argv)
     }
   }
   newHeader[1] = outPtr*sizeof(short);
-  write(schOutFId, &newHeader[0], 2*sizeof(int));
   if (outPtr*sizeof(short) > newDataSize) {
     fprintf(stderr, "Output buffer overflow (2): max: %d, now: %d - abort\n", newDataSize, outPtr);
     exit(ERROR);
   }
-  write(schOutFId, &newData[0], outPtr*sizeof(short));
+  write(schOutFId, &bigData[0], outPtr*sizeof(short) + 2*sizeof(int));
   sprintf(shellCommand, "chmod 666 %s/*", outDir);
   system(shellCommand);
   return(0);
