@@ -91,9 +91,9 @@ void printUsage(char *name) {
 
 int main (int argc, char **argv)
 {
-  int i, inFId, nRead, outFId, nSynth, justRegrid, eChan, sChan;
+  int i, nRead, nSynth, justRegrid, eChan, sChan;
   int newBandCounter = 0;
-  int schInFId, schOutFId, lastInhid, schDataSize, codesInFId, codesOutFId;
+  int lastInhid, schDataSize, codesInFId, codesOutFId;
   int outputDefault = FALSE;
   int gotInput = FALSE;
   int gotOutput = FALSE;
@@ -113,6 +113,7 @@ int main (int argc, char **argv)
   chunkSpec *lastChunk = NULL;
   codehDef oldCode;
   sphDef oldSp, newSp;
+  FILE *inFId, *outFId, *schInFId, *schOutFId;
 
   while ((i = getopt(argc, argv, "di:o:")) != -1) {
     switch (i) {
@@ -324,26 +325,26 @@ int main (int argc, char **argv)
   }
 
   sprintf(fileName, "%s/sch_read", inDir);
-  schInFId = open(fileName, O_RDONLY);
-  if (schInFId < 0) {
+  schInFId = fopen(fileName, "rb");
+  if (schInFId == NULL) {
     perror("Open of sch_read");
     exit(ERROR);
   }
   sprintf(fileName, "%s/sch_read", outDir);
-  schOutFId = open(fileName, O_WRONLY|O_CREAT);
-  if (schOutFId < 0) {
+  schOutFId = fopen(fileName, "wb");
+  if (schOutFId == NULL) {
     perror("Open of sch_read (new)");
     exit(ERROR);
   }
   sprintf(fileName, "%s/sp_read", inDir);
-  inFId = open(fileName, O_RDONLY);
-  if (inFId < 0) {
+  inFId = fopen(fileName, "rb");
+  if (inFId == NULL) {
     perror("Open of sp_read");
     exit(ERROR);
   }
   sprintf(fileName, "%s/sp_read", outDir);
-  outFId = open(fileName, O_WRONLY|O_CREAT);
-  if (outFId < 0) {
+  outFId = fopen(fileName, "wb");
+  if (outFId == NULL) {
     perror("Open of sp_read (new)");
     exit(ERROR);
   }
@@ -368,7 +369,7 @@ int main (int argc, char **argv)
     int found = FALSE;
     int factor = 1;
 
-    nRead = read(inFId, &oldSp, sizeof(oldSp));
+    nRead = fread_unlocked(&oldSp, 1, sizeof(oldSp), inFId);
     if (nRead == sizeof(oldSp)) {
       if (oldSp.inhid != lastInhid) {
 	int schNRead;
@@ -383,9 +384,9 @@ int main (int argc, char **argv)
 	    fprintf(stderr, "Output buffer overflow (2): max: %d, now: %d - abort\n", newDataSize, outPtr);
 	    exit(ERROR);
 	  }
-	  write(schOutFId, &bigData[0], outPtr*sizeof(short) + 2*sizeof(int));
+	  fwrite_unlocked(&bigData[0], 1, outPtr*sizeof(short) + 2*sizeof(int), schOutFId);
 	}
-	schNRead = read(schInFId, &header[0], 2*sizeof(int));
+	schNRead = fread_unlocked(&header[0], 1, 2*sizeof(int), schInFId);
 	if (schNRead != 2*sizeof(int)) {
 	  fprintf(stderr, "Only got %d bytes from sch_read - should have gotten %ld\n", schNRead, 2*sizeof(int));
 	  exit(ERROR);
@@ -418,7 +419,7 @@ int main (int argc, char **argv)
 	newHeader[0] = header[0];
 	newSize = outPtr = 0;
 	
-	schNRead = read(schInFId, data, schDataSize);
+	schNRead = fread_unlocked(data, 1, schDataSize, schInFId);
 	if (schNRead != schDataSize) {
 	  fprintf(stderr, "Didn't get the data I needed from sch_read - wanted %d, got %d - abort\n",
 		  schDataSize, schNRead);
@@ -514,7 +515,7 @@ int main (int argc, char **argv)
 	      newData[outPtr++] = (short)( ((float)imagIntSum) / ((float)factor) );
 	    }
 	    newSp.nch = (oldSp.nch - sChan - ((oldSp.nch-1) - eChan))/factor;
-	    write(outFId, &newSp, sizeof(newSp));
+	    fwrite_unlocked(&newSp, 1, sizeof(newSp), outFId);
 	  }
 	  ptr = ptr->next;
 	}
@@ -524,7 +525,7 @@ int main (int argc, char **argv)
 	memcpy(&newData[outPtr], &data[oldSp.dataoff/2], 4*oldSp.nch + 2);
 	oldSp.dataoff = outPtr*2;
 	outPtr +=  2*oldSp.nch + 1;
-	write(outFId, &oldSp, sizeof(oldSp));
+	fwrite_unlocked(&oldSp, 1, sizeof(oldSp), outFId);
       }
     }
   }
@@ -533,7 +534,7 @@ int main (int argc, char **argv)
     fprintf(stderr, "Output buffer overflow (2): max: %d, now: %d - abort\n", newDataSize, outPtr);
     exit(ERROR);
   }
-  write(schOutFId, &bigData[0], outPtr*sizeof(short) + 2*sizeof(int));
+  fwrite_unlocked(&bigData[0], 1, outPtr*sizeof(short) + 2*sizeof(int), schOutFId);
   sprintf(shellCommand, "chmod 666 %s/*", outDir);
   system(shellCommand);
   return(0);
