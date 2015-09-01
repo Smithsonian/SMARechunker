@@ -91,7 +91,8 @@ void printUsage(char *name) {
 
 int main (int argc, char **argv)
 {
-  int i, nRead, nSynth, justRegrid, eChan, sChan;
+  unsigned int i, j;
+  int nRead, nSynth, justRegrid, eChan, sChan;
   int newBandCounter = 0;
   int lastInhid, schDataSize, codesInFId, codesOutFId;
   int outputDefault = FALSE;
@@ -103,6 +104,7 @@ int main (int argc, char **argv)
   int *newHeader = NULL;
   int newSize;
   int outPtr = 0;
+  float invFactor;
   short *data = NULL;
   short *newData = NULL;
   short *bigData = NULL;
@@ -435,13 +437,15 @@ int main (int argc, char **argv)
 
 	while (ptr != NULL) {
 	  if (oldSp.iband == ptr->sourceChunk) {
-	    int i, j, oldPtr, realIntSum, imagIntSum;
+	    unsigned int high, oldPtr;
+	    int realIntSum, imagIntSum;
 	    short *tData;
 	    
 	    found = TRUE;
 	    sChan = ptr->startChan;
 	    eChan = ptr->endChan;
 	    factor = ptr->nAve;
+	    invFactor = 1.0/((float)factor);
 	    
 	    /* Regrid the chunk! */
 	    
@@ -463,7 +467,8 @@ int main (int argc, char **argv)
 	    newSp.fres *= factor;
 	    newSp.iband = ptr->iband;
 	    tData = &data[1+oldPtr];
-	    for (i = sChan/factor; i < (eChan+1)/factor; i++) {
+	    high = (eChan+1)/factor;
+	    for (i = sChan/factor; i < high; i++) {
 	      realIntSum = imagIntSum = 0;
 	      /*
 		This somewhat ugly switch is used to allow the compiler to know the size of the loop
@@ -511,8 +516,8 @@ int main (int argc, char **argv)
 		  imagIntSum += *tData++;
 		}
 	      }
-	      newData[outPtr++] = (short)( ((float)realIntSum) / ((float)factor) );
-	      newData[outPtr++] = (short)( ((float)imagIntSum) / ((float)factor) );
+	      newData[outPtr++] = (float)realIntSum * invFactor;
+	      newData[outPtr++] = (float)imagIntSum * invFactor;
 	    }
 	    newSp.nch = (oldSp.nch - sChan - ((oldSp.nch-1) - eChan))/factor;
 	    fwrite_unlocked(&newSp, 1, sizeof(newSp), outFId);
