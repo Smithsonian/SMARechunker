@@ -466,7 +466,7 @@ int main (int argc, char **argv)
 	    }
 	    newSp.fres *= factor;
 	    newSp.iband = ptr->iband;
-	    tData = &data[1+oldPtr];
+	    tData = &data[1+oldPtr + 2*sChan];
 	    high = (eChan+1)/factor;
 	    for (i = sChan/factor; i < high; i++) {
 	      realIntSum = imagIntSum = 0;
