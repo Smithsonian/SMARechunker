@@ -465,6 +465,7 @@ int main (int argc, char **argv)
 	      newSp.fsky = (fs + fe)/2.0;
 	    }
 	    newSp.fres *= factor;
+	    newSp.wt *= factor;
 	    newSp.iband = ptr->iband;
 	    tData = &data[1+oldPtr + 2*sChan];
 	    high = (eChan+1)/factor;
