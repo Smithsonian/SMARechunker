@@ -67,6 +67,182 @@ typedef struct __attribute__((packed)) sphDef {
   double sparedbl6; /* Spare double for future    */
 } sphDef;
 
+typedef struct __attribute__((packed)) blhDef {
+  int 	blhid     ; /*	proj. baseline id #  This is a unique identifier for this record         */
+  int 	inhid     ; /*	integration id #                                                         */
+  short	isb       ; /*	sideband int code                                                        */
+  short	ipol      ; /*	polarization int code                                                    */
+                    /*  0 = Unknown                                                              */
+                    /*  1 = RR                                                                   */
+                    /*  2 = RL                                                                   */
+                    /*  3 = LR                                                                   */
+                    /*  4 = LL                                                                   */
+  short	ant1rx    ; /*  This flag is meaningful only in Dual Rx Polar mode, when it is used to   */
+                    /*  specify the receiver used on the lower number receiver on the baseline.  */
+                    /*  0 = 345 Rx                                                               */
+                    /*  1 = 400 Rx                                                               */
+                    /*  anything else is bad data now, but additional receivers may be defined   */
+                    /*  in the future.                                                           */
+  short	ant2rx    ; /*  This flag is meaningful only in Dual Rx Polar mode, when it is used to   */
+                    /*  specify the receiver used on the higer number receiver on the baseline.  */
+                    /*  0 = 345 Rx                                                               */
+                    /*  1 = 400 Rx                                                               */
+                    /*  anything else is bad data now, but additional receivers may be defined   */
+                    /*  in the future.                                                           */
+  short	pointing  ; /*	pointing data int code                                                   */
+                    /*  = 1 for no offsets                                                       */
+                    /*  = 0 otherwise                                                            */
+                    /*  Used to indicate off source ipoint scans.   This flag is not used for    */
+                    /* mosaicing offsets, etc.                                                   */
+  short	irec      ; /*	receiver int code                                                        */
+                    /*  0 = 230                                                                  */
+                    /*  1 = 345                                                                  */
+                    /*  2 = 400                                                                  */
+                    /*  3 = 600                                                                  */
+                    /* -1 = Rx unknown                                                           */
+  float	u         ; /*	u coord. for bsl (klambda)                                               */
+  float	v         ; /*	v coord. for bsl (klambda)                                               */
+  float	w         ; /*	w coord. for bsl (klambda)                                               */
+  float	prbl      ; /*	projected baseline                                                       */
+  float	coh       ; /*	coherence estimate - This is the ratio of the vector average (over       */
+                    /*  spectral channels) to the scalar average, over all chunks (weighted by   */
+                    /*  channel bandwidth to give equal weight to every Hz interval).            */
+  double avedhrs  ; /*	This is the midpoint time for the scan, in hours.                        */
+  float	ampave    ; /*	ave continuum amp (vector average of all channels)                       */
+  float	phaave    ; /*	ave continuum phase                                                      */
+  int 	blsid     ; /*	physical baseline id #  This is an integer label for this baseline       */
+  short	iant1     ; /*	antenna number of first antenna in baseline                              */
+  short	iant2     ; /*	antenna number of second antenna in baseline                             */
+  int ant1TsysOff ; /*  Byte offset to start of Tsys information for first antenna of this       */
+                    /*  baseline and this scan.  This is a byte offset to the data in the        */
+                    /*  tsys_read file, for the data corresponding to the first antenna on this  */
+                    /*  baseline, for one particular scan (identified by inhid).                 */ 
+  int ant2TsysOff ; /*  Byte offset for Tsys data for the second antenna in the baseline         */
+  short	iblcd     ; /*	baseline int code                                                        */
+  float	ble       ; /*	bsl east vector (klambda)                                                */
+  float	bln       ; /*	bsl north vector klambda)                                                */
+  float	blu       ; /*	bsl up vector   klambda)                                                 */
+  int spareint1   ; /*  Spare Int. for (currently used as antenna 1 offset to tsys_read2 file)   */
+  int spareint2   ; /*  (currently used as antenna 2 offset to tsys_read2 file)                  */
+  int spareint3   ; /*                                                                           */
+  int spareint4   ; /*                                                                           */
+  int spareint5   ; /*                                                                           */
+  int spareint6   ; /*                                                                           */
+  double sparedbl1; /* Spare Dbl. for future use                                                 */
+  double spatedbl2; /*                                                                           */
+  double sparedbl3; /*                                                                           */
+  double sparedbl4; /*                                                                           */
+  double sparedbl5; /*                                                                           */
+  double sparedbl6; /*                                                                           */
+} blhDef;
+/* the size of blhDef is 158 bytes */
+
+typedef struct __attribute__((packed)) antEngDef {
+  int antennaNumber;
+  int padNumber;
+  int antennaStatus;  /*  Antenna is ON or OFF LINE                                              */
+  int trackStatus;    /*  Track is running or not                                                */
+  int commStatus;     /*  Data for this integration is valid or not                              */
+  int inhid    ;      /*  integration id #                                                       */
+  int ints     ;      /*  integration #                                                          */
+  double dhrs  ;      /*  hrs from ref_time                                                      */
+  double ha    ;      /*  hour angle                                                             */
+  double lst   ;      /*  lst                                                                    */
+  double pmdaz ;      /*  pointing model correction                                              */
+  double pmdel ;
+  double tiltx ;
+  double tilty ;
+  double actual_az ;
+  double actual_el ;
+  double azoff ;
+  double eloff ;
+  double az_tracking_error ;
+  double el_tracking_error ;
+  double refraction ;
+  double chopper_x ;
+  double chopper_y ;
+  double chopper_z ;
+  double chopper_angle ;
+  double tsys ;
+  double tsys_rx2 ;
+  double ambient_load_temperature ;
+  
+} antEngDef;
+/* The size of antEngDef is 196 bytes */
+
+typedef struct __attribute__((packed)) inhDef {
+  int 	traid     ; /*  track id # Set to the Project ID.   This is the realtime system's         */
+                    /*  project ID, created by the "project" command, and has nothing to do with  */
+                    /*  the proposal ID                                                           */
+  int 	inhid     ; /*  integration id #                                                          */
+  int 	ints      ; /*  integration # (scan number)                                               */
+                    /*  In reality, same as inhid                                                 */
+  float	az        ; /*  azimuth  (degrees)                                                        */
+  float	el        ; /*  elevation (degrees)                                                       */
+  float	ha        ; /*  hour angle (hours)                                                        */
+  short	iut       ; /*  Scan number                                                               */
+  short	iref_time ; /*  ref_time int code (points to a codes_read entry)                          */
+  double dhrs     ; /*  average time at scan midpoint in hours                                    */
+  float	vc        ; /*  Radial vel. - catalog vel. in km/sec                                      */
+  double sx       ; /*  x vec. for bsl. (unit vector x component towards source)                  */
+  double sy       ; /*  y vec. for bsl.                                                           */
+  double sz       ; /*  z vec. for bsl.                                                           */
+  float	rinteg    ; /*  actual int time (legth of scan in seconds)                                */
+  int 	proid     ; /*  project id #                                                              */
+  int 	souid     ; /*  source id #                                                               */
+  short	isource   ; /*  source int code (references a codes_read entry)                           */
+  short	ivrad     ; /*  Index number for the radial velocity entry in codes_read                  */
+  float	offx      ; /*  offset in x (for mosaics) used for RA offset  (arcsec)                    */
+  float	offy      ; /*  offset in y  (for mosaics) used for Dec offset (arcsec)                   */
+  short	ira       ; /*  ra int code                                                               */
+  short	idec      ; /*  dec int code                                                              */
+  double rar      ; /*  ra (radians)                                                              */
+  double decr     ; /*  declination (radians)                                                     */
+  float	epoch     ; /*  epoch for coordinates, always set to 2000.0                               */
+  float	size      ; /*  source size (arcsec) Only nonzero for planets                             */
+  int spareint1   ; /*  Spare integer for future use                                              */
+  int spareint2   ; /*                                                                            */
+  int spareint3   ; /*                                                                            */
+  int spareint4   ; /*                                                                            */
+  int spareint5   ; /*                                                                            */
+  int spareint6   ; /*                                                                            */
+  double sparedbl1; /*  Spare double for future use                                               */
+  double spatedbl2; /*                                                                            */
+  double sparedbl3; /*                                                                            */
+  double sparedbl4; /*                                                                            */
+  double sparedbl5; /*                                                                            */
+  double sparedbl6; /*                                                                            */
+} inhDef;
+/* The size of inhDef is 188 bytes */
+
+typedef struct __attribute__((packed)) wehDef {
+  /*
+     Note the following arrays contain 11 elements.   Element n is used for antenna n, except in
+     the case of n=0, which stores the values from the observatory's weather station on the hangar.
+  */
+  int scanNumber;      /*  The scan number for which this info applies                            */
+  int flags[11];       /*  Flagging information from statusServer.                                */
+                       /*  Here are the flags which have been defined:                            */
+  /* Note that slot 0 of the following arrays contains the "observatory weather (usually the      */
+  /* Hangar weather station weather, and slot n contains the weather from the weather station on  */
+  /* antenna n.    The antenna weather stations only measure temperature, pressure and humidity.  */
+  float N[11];         /*  The refractivity used for the atmospheric delay correction for each    */
+                       /*  antenna.                                                               */
+  float Tamb[11];      /*  The ambient temperature (C) used for each antenna's  atmospheric delay */
+                       /*  correction.                                                            */
+  float pressure[11];  /*  The atmospheric pressure, in mbar, used for each antenna's atmospheric */
+                       /*  delay correction.                                                      */
+  float humid[11];     /*  The relative humidity, in percent, used for each antenna's atmospheric */
+                       /*  delay correction.                                                      */
+  float windSpeed[11]; /*  Wind speed in m/sec at each antenna. -1.0 if no hardware exists to     */
+                       /*  measure this                                                           */
+  float windDir[11];   /*  Wind direction, in radians measured from north through east, for each  */
+                       /*  antenna. -1.0 if no hardware exists.                                   */
+  float h2o[11];       /*  The boresite precipitable water vapor measured at each antenna.        */
+                       /*  -1.0 if no hardware exists.                                            */
+} wehDef;
+/* The size of wehDef is 356 bytes */
+
 typedef struct chunkSpec {
   int sourceChunk;
   int startChan;
@@ -85,13 +261,16 @@ int isLegalN(int n) {
 
 void printUsage(char *name) {
   printf("Usage:\n");
-  printf("%s -i {input directory} -o {output directory} [-d] {chunk spec}. {chunk spec} ...\n", name);
+  printf("%s -i {input directory} -o {output directory} [-f {first scan number}] [-l {last scan number}] [-d] {chunk spec} {chunk spec} ...\n", name);
   exit(0);
 }
 
 int main (int argc, char **argv)
 {
   unsigned int i, j;
+  int firstScanNumber = -1;
+  int lastScanNumber = -1;
+  int copyAllScans = TRUE;
   int nRead, nSynth, justRegrid, eChan, sChan;
   int newBandCounter = 0;
   int lastInhid, schDataSize, codesInFId, codesOutFId;
@@ -117,7 +296,7 @@ int main (int argc, char **argv)
   sphDef oldSp, newSp;
   FILE *inFId, *outFId, *schInFId, *schOutFId;
 
-  while ((i = getopt(argc, argv, "di:o:")) != -1) {
+  while ((i = getopt(argc, argv, "di:f:l:o:")) != -1) {
     switch (i) {
     case 'd':
       outputDefault = TRUE;
@@ -125,6 +304,14 @@ int main (int argc, char **argv)
     case 'i':
       gotInput = TRUE;
       inDir = optarg;
+      break;
+    case 'f':
+      firstScanNumber = atoi(optarg);
+      copyAllScans = FALSE;
+      break;
+    case 'l':
+      lastScanNumber = atoi(optarg);
+      copyAllScans = FALSE;
       break;
     case 'o':
       gotOutput = TRUE;
@@ -246,8 +433,37 @@ int main (int argc, char **argv)
   sprintf(shellCommand, "cp %s/autoCorrelations %s/", inDir, outDir);
   /* system(shellCommand); */
   printf("\tbl_read\n");
-  sprintf(shellCommand, "cp %s/bl_read %s/", inDir, outDir);
-  system(shellCommand);
+  if (copyAllScans) {
+    sprintf(shellCommand, "cp %s/bl_read %s/", inDir, outDir);
+    system(shellCommand);
+  } else {
+    /* Explicit scan numbers were given, so I can't just copy the file */
+    int nRead, blFDi, blFDo;
+    char fileName[100];
+    blhDef blh;
+
+    sprintf(fileName, "%s/bl_read", inDir);
+    blFDi = open(fileName, O_RDONLY);
+    if (blFDi < 0) {
+      perror("Open input bl_read");
+      exit(ERROR);
+    }
+    sprintf(fileName, "%s/bl_read", outDir);
+    blFDo = open(fileName, O_WRONLY|O_CREAT);
+    if (blFDo < 0) {
+      perror("Open output bl_read");
+      exit(ERROR);
+    }
+    do {
+      nRead = read(blFDi, &blh, sizeof(blh));
+      if (nRead == sizeof(blh)) {
+	if ((firstScanNumber <= blh.inhid) && (lastScanNumber >= blh.inhid))
+	  write(blFDo, &blh, sizeof(blh));
+      }
+    } while (nRead == sizeof(blh));
+    close(blFDi);
+    close(blFDo);
+  }
   if (justRegrid) {
     printf("\tcodes_read\n");
     sprintf(shellCommand, "cp %s/codes_read %s/", inDir, outDir);
@@ -257,11 +473,69 @@ int main (int argc, char **argv)
   sprintf(shellCommand, "cp %s/codeVersions %s/", inDir, outDir);
   system(shellCommand);
   printf("\teng_read\n");
-  sprintf(shellCommand, "cp %s/eng_read %s/", inDir, outDir);
-  system(shellCommand);
+  if (copyAllScans) {
+    sprintf(shellCommand, "cp %s/eng_read %s/", inDir, outDir);
+    system(shellCommand);
+  } else {
+    /* Explicit scan numbers were given, so I can't just copy the file */
+    int nRead, engFDi, engFDo;
+    char fileName[100];
+    antEngDef antEng;
+
+    sprintf(fileName, "%s/eng_read", inDir);
+    engFDi = open(fileName, O_RDONLY);
+    if (engFDi < 0) {
+      perror("Open input eng_read");
+      exit(ERROR);
+    }
+    sprintf(fileName, "%s/eng_read", outDir);
+    engFDo = open(fileName, O_WRONLY|O_CREAT);
+    if (engFDo < 0) {
+      perror("Open output eng_read");
+      exit(ERROR);
+    }
+    do {
+      nRead = read(engFDi, &antEng, sizeof(antEng));
+      if (nRead == sizeof(antEng)) {
+	if ((firstScanNumber <= antEng.inhid) && (lastScanNumber >= antEng.inhid))
+	  write(engFDo, &antEng, sizeof(antEng));
+      }
+    } while (nRead == sizeof(antEng));
+    close(engFDi);
+    close(engFDo);
+  }
   printf("\tin_read\n");
-  sprintf(shellCommand, "cp %s/in_read %s/", inDir, outDir);
-  system(shellCommand);
+  if (copyAllScans) {
+    sprintf(shellCommand, "cp %s/in_read %s/", inDir, outDir);
+    system(shellCommand);
+  } else {
+    /* Explicit scan numbers were given, so I can't just copy the file */
+    int nRead, inFDi, inFDo;
+    char fileName[100];
+    inhDef inh;
+
+    sprintf(fileName, "%s/in_read", inDir);
+    inFDi = open(fileName, O_RDONLY);
+    if (inFDi < 0) {
+      perror("Open input in_read");
+      exit(ERROR);
+    }
+    sprintf(fileName, "%s/in_read", outDir);
+    inFDo = open(fileName, O_WRONLY|O_CREAT);
+    if (inFDo < 0) {
+      perror("Open output in_read");
+      exit(ERROR);
+    }
+    do {
+      nRead = read(inFDi, &inh, sizeof(inh));
+      if (nRead == sizeof(inh)) {
+	if ((firstScanNumber <= inh.inhid) && (lastScanNumber >= inh.inhid))
+	  write(inFDo, &inh, sizeof(inh));
+      }
+    } while (nRead == sizeof(inh));
+    close(inFDi);
+    close(inFDo);
+  }
   printf("\tmodeInfo\n");
   sprintf(shellCommand, "cp %s/modeInfo %s/", inDir, outDir);
   system(shellCommand);
@@ -275,8 +549,38 @@ int main (int argc, char **argv)
   sprintf(shellCommand, "cp %s/tsys_read* %s/", inDir, outDir);
   system(shellCommand);
   printf("\twe_read\n");
-  sprintf(shellCommand, "cp %s/we_read* %s/", inDir, outDir);
-  system(shellCommand);
+  if (copyAllScans) {
+    sprintf(shellCommand, "cp %s/we_read* %s/", inDir, outDir);
+    system(shellCommand);
+  } else {
+    /* Explicit scan numbers were given, so I can't just copy the file */
+    int nRead, weFDi, weFDo;
+    char fileName[100];
+    wehDef weh;
+
+    sprintf(fileName, "%s/we_read", inDir);
+    weFDi = open(fileName, O_RDONLY);
+    if (weFDi < 0) {
+      perror("Open input we_read");
+      exit(ERROR);
+    }
+    sprintf(fileName, "%s/we_read", outDir);
+    weFDo = open(fileName, O_WRONLY|O_CREAT);
+    if (weFDo < 0) {
+      perror("Open output we_read");
+      exit(ERROR);
+    }
+    do {
+      nRead = read(weFDi, &weh, sizeof(weh));
+      if (nRead == sizeof(weh)) {
+	if ((firstScanNumber <= weh.scanNumber) && (lastScanNumber >= weh.scanNumber))
+	  write(weFDo, &weh, sizeof(weh));
+      }
+    } while (nRead == sizeof(weh));
+    close(weFDi);
+    close(weFDo);
+  }
+
   /* Now make the new files with the additional chunks */
   printf("Making the files which need modification\n");
 
@@ -373,168 +677,170 @@ int main (int argc, char **argv)
 
     nRead = fread_unlocked(&oldSp, 1, sizeof(oldSp), inFId);
     if (nRead == sizeof(oldSp)) {
-      if (oldSp.inhid != lastInhid) {
-	int schNRead;
-
-	if ((oldSp.inhid % 100) == 0)
-	  printf("Processing scan: %d\n", oldSp.inhid);
-	if (data != NULL) {
-	  /* Not the first record - need to write out last scan's data */
-
-	  newHeader[1] = outPtr*sizeof(short);
-	  if (outPtr*sizeof(short) > newDataSize) {
-	    fprintf(stderr, "Output buffer overflow (2): max: %d, now: %d - abort\n", newDataSize, outPtr);
+      if (copyAllScans || ((firstScanNumber <= oldSp.inhid) && (oldSp.inhid <= lastScanNumber))) {
+	if (oldSp.inhid != lastInhid) {
+	  int schNRead;
+	  
+	  if ((oldSp.inhid % 100) == 0)
+	    printf("Processing scan: %d\n", oldSp.inhid);
+	  if (data != NULL) {
+	    /* Not the first record - need to write out last scan's data */
+	    
+	    newHeader[1] = outPtr*sizeof(short);
+	    if (outPtr*sizeof(short) > newDataSize) {
+	      fprintf(stderr, "Output buffer overflow (2): max: %d, now: %d - abort\n", newDataSize, outPtr);
+	      exit(ERROR);
+	    }
+	    fwrite_unlocked(&bigData[0], 1, outPtr*sizeof(short) + 2*sizeof(int), schOutFId);
+	  }
+	  schNRead = fread_unlocked(&header[0], 1, 2*sizeof(int), schInFId);
+	  if (schNRead != 2*sizeof(int)) {
+	    fprintf(stderr, "Only got %d bytes from sch_read - should have gotten %ld\n", schNRead, 2*sizeof(int));
 	    exit(ERROR);
 	  }
-	  fwrite_unlocked(&bigData[0], 1, outPtr*sizeof(short) + 2*sizeof(int), schOutFId);
-	}
-	schNRead = fread_unlocked(&header[0], 1, 2*sizeof(int), schInFId);
-	if (schNRead != 2*sizeof(int)) {
-	  fprintf(stderr, "Only got %d bytes from sch_read - should have gotten %ld\n", schNRead, 2*sizeof(int));
-	  exit(ERROR);
-	}
-	if (schDataSize == UNINITIALIZED) {
-	  schDataSize = header[1];
-	} else if (schDataSize != header[1]) {
-	  fprintf(stderr, "data section size change - was %d, is now %d\n", schDataSize, header[1]);
-	  exit(ERROR);
-	}
-	if (oldSp.inhid != header[0]) {
-	  fprintf(stderr, "sp thinks inhid is %d, sch thinks inhid = %d - abort\n", oldSp.inhid, header[0]);
-	  exit(ERROR);
-	}
-	if (data == NULL) {
-	  data = (short *)malloc(schDataSize);
+	  if (schDataSize == UNINITIALIZED) {
+	    schDataSize = header[1];
+	  } else if (schDataSize != header[1]) {
+	    fprintf(stderr, "data section size change at scan %d  - was %d, is now %d\n", oldSp.inhid, schDataSize, header[1]);
+	    exit(ERROR);
+	  }
+	  if (oldSp.inhid != header[0]) {
+	    fprintf(stderr, "sp thinks inhid is %d, sch thinks inhid = %d - abort\n", oldSp.inhid, header[0]);
+	    exit(ERROR);
+	  }
 	  if (data == NULL) {
-	    perror("malloc of data");
+	    data = (short *)malloc(schDataSize);
+	    if (data == NULL) {
+	      perror("malloc of data");
+	      exit(ERROR);
+	    }
+	    newDataSize = schDataSize + nSynthSize;
+	    bigData = (short *)malloc(newDataSize + 2*sizeof(int));
+	    if (bigData == NULL) {
+	      perror("malloc of bigData");
+	      exit(ERROR);
+	    }
+	    newData = &bigData[4];
+	    newHeader = (int *)(&bigData[0]);
+	  }
+	  newHeader[0] = header[0];
+	  newSize = outPtr = 0;
+	  
+	  schNRead = fread_unlocked(data, 1, schDataSize, schInFId);
+	  if (schNRead != schDataSize) {
+	    fprintf(stderr, "Didn't get the data I needed from sch_read - wanted %d, got %d - abort\n",
+		    schDataSize, schNRead);
 	    exit(ERROR);
 	  }
-	  newDataSize = schDataSize + nSynthSize;
-	  bigData = (short *)malloc(newDataSize + 2*sizeof(int));
-	  if (bigData == NULL) {
-	    perror("malloc of bigData");
-	    exit(ERROR);
-	  }
-	  newData = &bigData[4];
-	  newHeader = (int *)(&bigData[0]);
+	  lastInhid = oldSp.inhid;
 	}
-	newHeader[0] = header[0];
-	newSize = outPtr = 0;
-	
-	schNRead = fread_unlocked(data, 1, schDataSize, schInFId);
-	if (schNRead != schDataSize) {
-	  fprintf(stderr, "Didn't get the data I needed from sch_read - wanted %d, got %d - abort\n",
-		  schDataSize, schNRead);
-	  exit(ERROR);
-	}
-	lastInhid = oldSp.inhid;
-      }
-      found = FALSE;
-      if ((oldSp.iband == 49) || (oldSp.iband == 50)) {
-	chunkSpec *ptr;
-
-	ptr = newChunkList;
-
-	while (ptr != NULL) {
-	  if (oldSp.iband == ptr->sourceChunk) {
-	    unsigned int high, oldPtr;
-	    int realIntSum, imagIntSum;
-	    short *tData;
-	    
-	    found = TRUE;
-	    sChan = ptr->startChan;
-	    eChan = ptr->endChan;
-	    factor = ptr->nAve;
-	    invFactor = 1.0/((float)factor);
-	    
-	    /* Regrid the chunk! */
-	    
-	    oldPtr = oldSp.dataoff/2;
-	    newData[outPtr] = data[oldPtr];
-	    memcpy(&newSp, &oldSp, sizeof(newSp));
-	    newSp.dataoff = 2*outPtr++;
-	    newSp.vres *= factor;
-	    if ((sChan != 0) || (eChan != (oldSp.nch-1))) {
-	      double n, f, fr, fs, fe;
+	found = FALSE;
+	if ((oldSp.iband == 49) || (oldSp.iband == 50)) {
+	  chunkSpec *ptr;
+	  
+	  ptr = newChunkList;
+	  
+	  while (ptr != NULL) {
+	    if (oldSp.iband == ptr->sourceChunk) {
+	      unsigned int high, oldPtr;
+	      int realIntSum, imagIntSum;
+	      short *tData;
 	      
-	      f = oldSp.fsky;
-	      fr = oldSp.fres/1.0e3;
-	      n = (double)oldSp.nch;
-	      fs = f - fr*(n/2.0 - (double)sChan);
-	      fe = f - fr*(n/2.0 - (double)eChan);
-	      newSp.fsky = (fs + fe)/2.0;
-	    }
-	    newSp.fres *= factor;
-	    newSp.wt *= factor;
-	    newSp.iband = ptr->iband;
-	    tData = &data[1+oldPtr + 2*sChan];
-	    high = (eChan+1)/factor;
-	    for (i = sChan/factor; i < high; i++) {
-	      realIntSum = imagIntSum = 0;
-	      /*
-		This somewhat ugly switch is used to allow the compiler to know the size of the loop
-		 for small values of "factor".   That in turn allows the compiler to unroll the loop
-		 in these cases.
-	       */
-	      switch (factor) {
-	      case 1:
-		realIntSum += *tData++;
-		imagIntSum += *tData++;
-		break;
-	      case 2:
-		for (j = 0; j < 2; j++) {
-		  realIntSum += *tData++;
-		  imagIntSum += *tData++;
-		}
-		break;
-	      case 4:
-		for (j = 0; j < 4; j++) {
-		  realIntSum += *tData++;
-		  imagIntSum += *tData++;
-		}
-		break;
-	      case 8:
-		for (j = 0; j < 8; j++) {
-		  realIntSum += *tData++;
-		  imagIntSum += *tData++;
-		}
-		break;
-	      case 16:
-		for (j = 0; j < 16; j++) {
-		  realIntSum += *tData++;
-		  imagIntSum += *tData++;
-		}
-		break;
-	      case 32:
-		for (j = 0; j < 32; j++) {
-		  realIntSum += *tData++;
-		  imagIntSum += *tData++;
-		}
-		break;
-	      default:
-		for (j = 0; j < factor; j++) {
-		  realIntSum += *tData++;
-		  imagIntSum += *tData++;
-		}
+	      found = TRUE;
+	      sChan = ptr->startChan;
+	      eChan = ptr->endChan;
+	      factor = ptr->nAve;
+	      invFactor = 1.0/((float)factor);
+	      
+	      /* Regrid the chunk! */
+	      
+	      oldPtr = oldSp.dataoff/2;
+	      newData[outPtr] = data[oldPtr];
+	      memcpy(&newSp, &oldSp, sizeof(newSp));
+	      newSp.dataoff = 2*outPtr++;
+	      newSp.vres *= factor;
+	      if ((sChan != 0) || (eChan != (oldSp.nch-1))) {
+		double n, f, fr, fs, fe;
+		
+		f = oldSp.fsky;
+		fr = oldSp.fres/1.0e3;
+		n = (double)oldSp.nch;
+		fs = f - fr*(n/2.0 - (double)sChan);
+		fe = f - fr*(n/2.0 - (double)eChan);
+		newSp.fsky = (fs + fe)/2.0;
 	      }
-	      newData[outPtr++] = (float)realIntSum * invFactor;
-	      newData[outPtr++] = (float)imagIntSum * invFactor;
+	      newSp.fres *= factor;
+	      newSp.wt *= factor;
+	      newSp.iband = ptr->iband;
+	      tData = &data[1+oldPtr + 2*sChan];
+	      high = (eChan+1)/factor;
+	      for (i = sChan/factor; i < high; i++) {
+		realIntSum = imagIntSum = 0;
+		/*
+		  This somewhat ugly switch is used to allow the compiler to know the size of the loop
+		  for small values of "factor".   That in turn allows the compiler to unroll the loop
+		  in these cases.
+		*/
+		switch (factor) {
+		case 1:
+		  realIntSum += *tData++;
+		  imagIntSum += *tData++;
+		  break;
+		case 2:
+		  for (j = 0; j < 2; j++) {
+		    realIntSum += *tData++;
+		    imagIntSum += *tData++;
+		  }
+		  break;
+		case 4:
+		  for (j = 0; j < 4; j++) {
+		    realIntSum += *tData++;
+		    imagIntSum += *tData++;
+		  }
+		  break;
+		case 8:
+		  for (j = 0; j < 8; j++) {
+		    realIntSum += *tData++;
+		    imagIntSum += *tData++;
+		  }
+		  break;
+		case 16:
+		  for (j = 0; j < 16; j++) {
+		    realIntSum += *tData++;
+		    imagIntSum += *tData++;
+		  }
+		  break;
+		case 32:
+		  for (j = 0; j < 32; j++) {
+		    realIntSum += *tData++;
+		    imagIntSum += *tData++;
+		  }
+		  break;
+		default:
+		  for (j = 0; j < factor; j++) {
+		    realIntSum += *tData++;
+		    imagIntSum += *tData++;
+		  }
+		}
+		newData[outPtr++] = (float)realIntSum * invFactor;
+		newData[outPtr++] = (float)imagIntSum * invFactor;
+	      }
+	      newSp.nch = (oldSp.nch - sChan - ((oldSp.nch-1) - eChan))/factor;
+	      fwrite_unlocked(&newSp, 1, sizeof(newSp), outFId);
 	    }
-	    newSp.nch = (oldSp.nch - sChan - ((oldSp.nch-1) - eChan))/factor;
-	    fwrite_unlocked(&newSp, 1, sizeof(newSp), outFId);
+	    ptr = ptr->next;
 	  }
-	  ptr = ptr->next;
 	}
-      }
-      if (!found) {
-	/* Nothing needs to be done to this band - just pass it through */
-	memcpy(&newData[outPtr], &data[oldSp.dataoff/2], 4*oldSp.nch + 2);
-	oldSp.dataoff = outPtr*2;
-	outPtr +=  2*oldSp.nch + 1;
-	fwrite_unlocked(&oldSp, 1, sizeof(oldSp), outFId);
-      }
-    }
-  }
+	if (!found) {
+	  /* Nothing needs to be done to this band - just pass it through */
+	  memcpy(&newData[outPtr], &data[oldSp.dataoff/2], 4*oldSp.nch + 2);
+	  oldSp.dataoff = outPtr*2;
+	  outPtr +=  2*oldSp.nch + 1;
+	  fwrite_unlocked(&oldSp, 1, sizeof(oldSp), outFId);
+	}
+      } /* End of block executed if the scan number is in range for copying */
+    } /* End of block executed if the correct number of bytes are read (in other words, not EOF) */
+  } /* End of main while loop processing the data */
   newHeader[1] = outPtr*sizeof(short);
   if (outPtr*sizeof(short) > newDataSize) {
     fprintf(stderr, "Output buffer overflow (2): max: %d, now: %d - abort\n", newDataSize, outPtr);
