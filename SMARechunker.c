@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 #include <unistd.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -253,6 +254,9 @@ typedef struct chunkSpec {
 } chunkSpec;
 
 chunkSpec *newChunkList = NULL;
+
+float buffer[33000];
+int bufferPtr = 0;
 
 int isLegalN(int n) {
   return ((n == 1) || (n == 2) || (n == 4) || (n == 8) || (n == 16) || (n == 32) ||
@@ -736,13 +740,14 @@ int main (int argc, char **argv)
 	}
 	found = FALSE;
 	if ((oldSp.iband == 49) || (oldSp.iband == 50)) {
+	  int oldMin, oldMax, oldExp;
 	  chunkSpec *ptr;
 	  
 	  ptr = newChunkList;
 	  
 	  while (ptr != NULL) {
 	    if (oldSp.iband == ptr->sourceChunk) {
-	      unsigned int high, oldPtr;
+	      unsigned int high, oldPtr, savedPtr;
 	      int realIntSum, imagIntSum;
 	      short *tData;
 	      
@@ -756,6 +761,7 @@ int main (int argc, char **argv)
 	      
 	      oldPtr = oldSp.dataoff/2;
 	      newData[outPtr] = data[oldPtr];
+	      savedPtr = outPtr;
 	      memcpy(&newSp, &oldSp, sizeof(newSp));
 	      newSp.dataoff = 2*outPtr++;
 	      newSp.vres *= factor;
@@ -772,8 +778,10 @@ int main (int argc, char **argv)
 	      newSp.fres *= factor;
 	      newSp.wt *= factor;
 	      newSp.iband = ptr->iband;
+	      oldExp = data[oldPtr + 2*sChan];
 	      tData = &data[1+oldPtr + 2*sChan];
 	      high = (eChan+1)/factor;
+	      bufferPtr = 0;
 	      for (i = sChan/factor; i < high; i++) {
 		realIntSum = imagIntSum = 0;
 		/*
@@ -822,8 +830,40 @@ int main (int argc, char **argv)
 		    imagIntSum += *tData++;
 		  }
 		}
-		newData[outPtr++] = (float)realIntSum * invFactor;
-		newData[outPtr++] = (float)imagIntSum * invFactor;
+		buffer[bufferPtr++] = (float)realIntSum * invFactor;
+		buffer[bufferPtr++] = (float)imagIntSum * invFactor;
+	      }
+	      {
+		double ratio;
+
+		oldMax = -1000000000;
+		oldMin =  1000000000;
+		for (i = 0; i < bufferPtr; i++) {
+		  if (buffer[i] < oldMin)
+		    oldMin = buffer[i];
+		  if (buffer[i] > oldMax)
+		    oldMax = buffer[i];
+		}
+		if ((-oldMin) > oldMax)
+		  oldMax = -oldMin;
+		ratio = 32767.0/(double)oldMax;
+		if (ratio >= 2.0) {
+		  int newExp, iscale, scaleFactor;
+		  double scale;
+
+		  scale = log(ratio)/log(2.0);
+		  iscale = (int)scale;
+		  scaleFactor = (int)(pow(2, (float)iscale));
+		  if (oldExp < 0)
+		    newExp = oldExp - iscale;
+		  else
+		    newExp = oldExp + iscale;
+		  for (i = 0; i < bufferPtr; i++)
+		    newData[outPtr++] = buffer[i] * scaleFactor;
+		  newData[savedPtr] = newExp;
+		} else
+		  for (i = 0; i < bufferPtr; i++)
+		    newData[outPtr++] = buffer[i];
 	      }
 	      newSp.nch = (oldSp.nch - sChan - ((oldSp.nch-1) - eChan))/factor;
 	      fwrite_unlocked(&newSp, 1, sizeof(newSp), outFId);
