@@ -741,6 +741,7 @@ int main (int argc, char **argv)
 	found = FALSE;
 	if ((oldSp.iband == 49) || (oldSp.iband == 50)) {
 	  int oldMin, oldMax, oldExp;
+	  float ratio;
 	  chunkSpec *ptr;
 	  
 	  ptr = newChunkList;
@@ -833,38 +834,38 @@ int main (int argc, char **argv)
 		buffer[bufferPtr++] = (float)realIntSum * invFactor;
 		buffer[bufferPtr++] = (float)imagIntSum * invFactor;
 	      }
-	      {
-		double ratio;
-
-		oldMax = -1000000000;
-		oldMin =  1000000000;
-		for (i = 0; i < bufferPtr; i++) {
-		  if (buffer[i] < oldMin)
-		    oldMin = buffer[i];
-		  if (buffer[i] > oldMax)
-		    oldMax = buffer[i];
-		}
-		if ((-oldMin) > oldMax)
-		  oldMax = -oldMin;
-		ratio = 32767.0/(double)oldMax;
-		if (ratio >= 2.0) {
-		  int newExp, iscale, scaleFactor;
-		  double scale;
-
-		  scale = log(ratio)/log(2.0);
-		  iscale = (int)scale;
-		  scaleFactor = (int)(pow(2, (float)iscale));
-		  if (oldExp < 0)
-		    newExp = oldExp - iscale;
-		  else
-		    newExp = oldExp + iscale;
-		  for (i = 0; i < bufferPtr; i++)
-		    newData[outPtr++] = buffer[i] * scaleFactor;
-		  newData[savedPtr] = newExp;
-		} else
-		  for (i = 0; i < bufferPtr; i++)
-		    newData[outPtr++] = buffer[i];
+	      /* See if the scale factor for this spectrum should be changed */
+	      oldMax = -1000000000;
+	      oldMin =  1000000000;
+	      for (i = 0; i < bufferPtr; i++) {
+		if (buffer[i] < oldMin)
+		  oldMin = buffer[i];
+		if (buffer[i] > oldMax)
+		  oldMax = buffer[i];
 	      }
+	      if ((-oldMin) > oldMax)
+		oldMax = -oldMin;
+	      if (oldMax != 0)
+		ratio = 32767.0f/(float)oldMax;
+	      else
+		ratio = 1.0f;
+	      if (ratio >= 2.0f) {
+		int newExp, iscale;
+		float scale, scaleFactor;
+		
+		scale = log(ratio)/M_LN2;
+		iscale = (int)scale;
+		scaleFactor = powf(2.0f, (float)iscale);
+		if (oldExp < 0)
+		  newExp = oldExp - iscale;
+		else
+		  newExp = oldExp + iscale;
+		for (i = 0; i < bufferPtr; i++)
+		  newData[outPtr++] = buffer[i] * scaleFactor;
+		newData[savedPtr] = newExp;
+	      } else
+		for (i = 0; i < bufferPtr; i++)
+		  newData[outPtr++] = buffer[i];
 	      newSp.nch = (oldSp.nch - sChan - ((oldSp.nch-1) - eChan))/factor;
 	      fwrite_unlocked(&newSp, 1, sizeof(newSp), outFId);
 	    }
