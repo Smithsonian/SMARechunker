@@ -285,8 +285,10 @@ int main (int argc, char **argv)
   int nSynthSize = 0;
   int newDataSize = 0;
   int *newHeader = NULL;
+  int maxSWARMChunk = 0;
   int newSize;
   int outPtr = 0;
+  int nSWARMChunks = 0;
   float invFactor;
   short *data = NULL;
   short *newData = NULL;
@@ -327,18 +329,45 @@ int main (int argc, char **argv)
   }
   if (!gotInput || !gotOutput)
     printUsage(argv[0]);
+  {
+    int codeFId, done, bandCount;
+
+    sprintf(fileName, "%s/codes_read", inDir);
+    codeFId = open(fileName, O_RDONLY);
+    if (codeFId < 0) {
+      perror("Open input codes_read");
+      exit(ERROR);
+    }
+    done = FALSE;
+    bandCount = 0;
+    do {
+      nRead = read(codeFId, &oldCode, sizeof(oldCode));
+      if (nRead == sizeof(oldCode)) {
+	if ((!strcmp(oldCode.v_name, "ut") && (bandCount > 1)))
+	  done = TRUE;
+	else if (!strcmp(oldCode.v_name, "band")) {
+	  bandCount++;
+	  if (oldCode.icode > 48)
+	    nSWARMChunks++;
+	}
+      }
+    } while ((nRead == sizeof(oldCode)) && !done);
+    close(codeFId);
+    maxSWARMChunk = 48+nSWARMChunks;
+    printf("Number of SWARM bands seen: %d\n", nSWARMChunks);
+  }
   if (optind >= argc) {
     fprintf(stderr, "You must specify at least one chunk specification\n");
     printUsage(argv[0]);
   } else
     nSynth = argc-optind;
-  if (!outputDefault && (nSynth < 3))
+  if (!outputDefault && (nSynth <= nSWARMChunks))
     justRegrid = TRUE;
   else
     justRegrid = FALSE;
   if (outputDefault) {
     /* Define two "new" chunks which are just the raw SWARM chunks without any changes */
-    for (i = 49; i <= 50; i++) {
+    for (i = 49; i <= maxSWARMChunk; i++) {
       newChunk = malloc(sizeof(*newChunk));
       if (newChunk == NULL) {
 	perror("newChunk malloc");
@@ -366,10 +395,10 @@ int main (int argc, char **argv)
       fprintf(stderr, "Cannot parse chunk specification \"%s\"\n", argv[i+optind]);
       exit(ERROR);
     }
-    if ((chunk < 49) || (chunk > 50)) {
+    if ((chunk < 49) || (chunk > maxSWARMChunk)) {
       fprintf(stderr, "Error in new chunk spcification #%d\n", i+1);
-      fprintf(stderr, "\"%s\" is an invalid chunk specifier - input chunk (%d) must be 49 or 50\n",
-	      argv[i+optind], chunk);
+      fprintf(stderr, "\"%s\" is an invalid chunk specifier - input chunk (%d) must be between 49 and %d inclusive\n",
+	      argv[i+optind], chunk, maxSWARMChunk);
       exit(ERROR);
     }
     if (!isLegalN(n)) {
@@ -739,7 +768,8 @@ int main (int argc, char **argv)
 	  lastInhid = oldSp.inhid;
 	}
 	found = FALSE;
-	if ((oldSp.iband == 49) || (oldSp.iband == 50)) {
+	if ((oldSp.iband >= 49) && (oldSp.iband <= maxSWARMChunk)) {
+	  /*	if ((oldSp.iband == 49) || (oldSp.iband == 50)) { */
 	  int oldMin, oldMax, oldExp;
 	  float ratio;
 	  chunkSpec *ptr;
