@@ -265,7 +265,7 @@ int isLegalN(int n) {
 
 void printUsage(char *name) {
   printf("Usage:\n");
-  printf("%s -i {input directory} -o {output directory} [-f {first scan number}] [-l {last scan number}] [-d] {chunk spec} {chunk spec} ...\n", name);
+  printf("%s -i {input directory} -o {output directory} [-f {first scan number}] [-l {last scan number}] [-d] [-r {n} reduce all SWARM chunks by a factor of n} {chunk spec} {chunk spec} ...\n", name);
   exit(0);
 }
 
@@ -274,6 +274,7 @@ int main (int argc, char **argv)
   unsigned int i, j;
   int firstScanNumber = -1;
   int lastScanNumber = -1;
+  int globalAverage = FALSE;
   int copyAllScans = TRUE;
   int nRead, nSynth, justRegrid, eChan, sChan;
   int newBandCounter = 0;
@@ -302,7 +303,7 @@ int main (int argc, char **argv)
   sphDef oldSp, newSp;
   FILE *inFId, *outFId, *schInFId, *schOutFId;
 
-  while ((i = getopt(argc, argv, "di:f:l:o:")) != -1) {
+  while ((i = getopt(argc, argv, "di:f:l:o:r:")) != -1) {
     switch (i) {
     case 'd':
       outputDefault = TRUE;
@@ -322,6 +323,17 @@ int main (int argc, char **argv)
     case 'o':
       gotOutput = TRUE;
       outDir = optarg;
+      break;
+    case 'r':
+      globalAverage = atoi(optarg);
+      if (globalAverage & (globalAverage - 1)) {
+	fprintf(stderr, "The argument for -r must be a power of 2\n");
+	exit(ERROR);
+      }
+      if (globalAverage > 4096) {
+	fprintf(stderr, "The argument for -r must be less than 8192\n");
+	exit(ERROR);
+      }
       break;
     default:
       printUsage(argv[0]);
@@ -356,12 +368,15 @@ int main (int argc, char **argv)
     maxSWARMChunk = 48+nSWARMChunks;
     printf("Number of SWARM bands seen: %d\n", nSWARMChunks);
   }
-  if (optind >= argc) {
-    fprintf(stderr, "You must specify at least one chunk specification\n");
+  if ((optind >= argc) & (!globalAverage)) {
+    fprintf(stderr, "You must specify at least one chunk specification or use -r {n}\n");
     printUsage(argv[0]);
+  } else if (globalAverage && ((argc-optind) > 0)) {
+    fprintf(stderr, "You cannot specify both -r {n} and individual chunk specifications\n");
+    exit(ERROR);
   } else
     nSynth = argc-optind;
-  if (!outputDefault && (nSynth <= nSWARMChunks))
+  if ((!outputDefault && (nSynth <= nSWARMChunks)) || globalAverage)
     justRegrid = TRUE;
   else
     justRegrid = FALSE;
@@ -386,68 +401,89 @@ int main (int argc, char **argv)
       lastChunk = newChunk;    
     }
   }
-  for (i = 0; i < nSynth; i++) {
-    int chunk, n, nRead;
-
-    nRead = sscanf(argv[i+optind], "%d:%d:%d:%d", &chunk, &sChan, &eChan, &n);
-    if (nRead != 4) {
-      fprintf(stderr, "Error in new chunk spcification #%d\n", i+1);
-      fprintf(stderr, "Cannot parse chunk specification \"%s\"\n", argv[i+optind]);
-      exit(ERROR);
+  if (globalAverage) {
+    for (i = 0; i < nSWARMChunks; i++) {
+      newChunk = malloc(sizeof(*newChunk));
+      if (newChunk == NULL) {
+	perror("newChunk malloc");
+	exit(ERROR);
+      }
+      newChunk->sourceChunk = 49+i;
+      newChunk->startChan = 0;
+      newChunk->endChan = 16383;
+      newChunk->nAve = globalAverage;
+      newChunk->iband = 49+newBandCounter++;
+      newChunk->next = NULL;
+      if (newChunkList == NULL)
+	newChunkList = newChunk;
+      else
+	lastChunk->next = newChunk;
+      lastChunk = newChunk;
     }
-    if ((chunk < 49) || (chunk > maxSWARMChunk)) {
-      fprintf(stderr, "Error in new chunk spcification #%d\n", i+1);
-      fprintf(stderr, "\"%s\" is an invalid chunk specifier - input chunk (%d) must be between 49 and %d inclusive\n",
-	      argv[i+optind], chunk, maxSWARMChunk);
-      exit(ERROR);
+  } else {
+    for (i = 0; i < nSynth; i++) {
+      int chunk, n, nRead;
+      
+      nRead = sscanf(argv[i+optind], "%d:%d:%d:%d", &chunk, &sChan, &eChan, &n);
+      if (nRead != 4) {
+	fprintf(stderr, "Error in new chunk spcification #%d\n", i+1);
+	fprintf(stderr, "Cannot parse chunk specification \"%s\"\n", argv[i+optind]);
+	exit(ERROR);
+      }
+      if ((chunk < 49) || (chunk > maxSWARMChunk)) {
+	fprintf(stderr, "Error in new chunk spcification #%d\n", i+1);
+	fprintf(stderr, "\"%s\" is an invalid chunk specifier - input chunk (%d) must be between 49 and %d inclusive\n",
+		argv[i+optind], chunk, maxSWARMChunk);
+	exit(ERROR);
+      }
+      if (!isLegalN(n)) {
+	fprintf(stderr, "Error in new chunk spcification #%d\n", i+1);
+	fprintf(stderr,
+		"Illegal number of channels to average (%d), must be a power of 2 between 1 and 1024 (inclusive)\n", n);
+	exit(ERROR);
+      }
+      if (sChan > eChan) {
+	fprintf(stderr, "Error in new chunk spcification #%d\n", i+1);
+	fprintf(stderr,
+		"The starting channel number must be less than the ending channel number\n");
+	exit(ERROR);
+      }
+      if ((sChan < 0) || (sChan > 16382)) {
+	fprintf(stderr, "Error in new chunk spcification #%d\n", i+1);
+	fprintf(stderr,
+		"The starting channel number must be between 0 and 16382\n");
+	exit(ERROR);
+      }
+      if ((eChan < 1) || (sChan > 16383)) {
+	fprintf(stderr, "Error in new chunk spcification #%d\n", i+1);
+	fprintf(stderr,
+		"The ending channel number must be between 1 and 16383\n");
+	exit(ERROR);
+      }
+      if ((eChan - sChan +1) % n) {
+	fprintf(stderr, "Error in new chunk spcification #%d\n", i+1);
+	fprintf(stderr,
+		"The total number of input channels (%d) is not evenly divisible by %d - aborting\n",
+		eChan-sChan+1, n);
+	exit(ERROR);
+      }
+      newChunk = malloc(sizeof(*newChunk));
+      if (newChunk == NULL) {
+	perror("newChunk malloc");
+	exit(ERROR);
+      }
+      newChunk->sourceChunk = chunk;
+      newChunk->startChan = sChan;
+      newChunk->endChan = eChan;
+      newChunk->nAve = n;
+      newChunk->iband = 49+newBandCounter++;
+      newChunk->next = NULL;
+      if (newChunkList == NULL)
+	newChunkList = newChunk;
+      else
+	lastChunk->next = newChunk;
+      lastChunk = newChunk;
     }
-    if (!isLegalN(n)) {
-      fprintf(stderr, "Error in new chunk spcification #%d\n", i+1);
-      fprintf(stderr,
-	      "Illegal number of channels to average (%d), must be a power of 2 between 1 and 1024 (inclusive)\n", n);
-      exit(ERROR);
-    }
-    if (sChan > eChan) {
-      fprintf(stderr, "Error in new chunk spcification #%d\n", i+1);
-      fprintf(stderr,
-	      "The starting channel number must be less than the ending channel number\n");
-      exit(ERROR);
-    }
-    if ((sChan < 0) || (sChan > 16382)) {
-      fprintf(stderr, "Error in new chunk spcification #%d\n", i+1);
-      fprintf(stderr,
-	      "The starting channel number must be between 0 and 16382\n");
-      exit(ERROR);
-    }
-    if ((eChan < 1) || (sChan > 16383)) {
-      fprintf(stderr, "Error in new chunk spcification #%d\n", i+1);
-      fprintf(stderr,
-	      "The ending channel number must be between 1 and 16383\n");
-      exit(ERROR);
-    }
-    if ((eChan - sChan +1) % n) {
-      fprintf(stderr, "Error in new chunk spcification #%d\n", i+1);
-      fprintf(stderr,
-	      "The total number of input channels (%d) is not evenly divisible by %d - aborting\n",
-	      eChan-sChan+1, n);
-      exit(ERROR);
-    }
-    newChunk = malloc(sizeof(*newChunk));
-    if (newChunk == NULL) {
-      perror("newChunk malloc");
-      exit(ERROR);
-    }
-    newChunk->sourceChunk = chunk;
-    newChunk->startChan = sChan;
-    newChunk->endChan = eChan;
-    newChunk->nAve = n;
-    newChunk->iband = 49+newBandCounter++;
-    newChunk->next = NULL;
-    if (newChunkList == NULL)
-      newChunkList = newChunk;
-    else
-      lastChunk->next = newChunk;
-    lastChunk = newChunk;
   }
   if (outputDefault)
     nSynth += 2;
