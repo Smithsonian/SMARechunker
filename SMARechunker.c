@@ -845,7 +845,7 @@ int main (int argc, char **argv)
 	      newSp.fres *= factor;
 	      newSp.wt *= factor;
 	      newSp.iband = ptr->iband;
-	      oldExp = data[oldPtr + 2*sChan];
+	      oldExp = data[oldPtr];
 	      tData = &data[1+oldPtr + 2*sChan];
 	      high = (eChan+1)/factor;
 	      bufferPtr = 0;
