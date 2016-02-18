@@ -805,7 +805,6 @@ int main (int argc, char **argv)
 	}
 	found = FALSE;
 	if ((oldSp.iband >= 49) && (oldSp.iband <= maxSWARMChunk)) {
-	  /*	if ((oldSp.iband == 49) || (oldSp.iband == 50)) { */
 	  int oldMin, oldMax, oldExp;
 	  float ratio;
 	  chunkSpec *ptr;
