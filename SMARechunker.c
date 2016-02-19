@@ -366,6 +366,10 @@ int main (int argc, char **argv)
     } while ((nRead == sizeof(oldCode)) && !done);
     close(codeFId);
     maxSWARMChunk = 48+nSWARMChunks;
+    if (nSWARMChunks == 0) {
+      fprintf(stderr, "No SWARM data seen in the input data directory - aborting\n");
+      exit(ERROR);
+    }
     printf("Number of SWARM bands seen: %d\n", nSWARMChunks);
   }
   if ((optind >= argc) & (!globalAverage)) {
