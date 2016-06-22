@@ -612,6 +612,9 @@ int main (int argc, char **argv)
   printf("\tmodeInfo\n");
   sprintf(shellCommand, "cp %s/modeInfo %s/", inDir, outDir);
   system(shellCommand);
+  printf("\tipoint files\n");
+  sprintf(shellCommand, "cp %s/ipointResults.* %s/", inDir, outDir);
+  system(shellCommand);
   printf("\tplot_me files\n");
   sprintf(shellCommand, "cp %s/plot_me* %s/", inDir, outDir);
   system(shellCommand);
