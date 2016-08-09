@@ -855,6 +855,7 @@ int main (int argc, char **argv)
 	      tData = &data[1+oldPtr + 2*sChan];
 	      high = (eChan+1)/factor;
 	      bufferPtr = 0;
+	      outPtr += 2;
 	      for (i = sChan/factor; i < high; i++) {
 		realIntSum = imagIntSum = 0;
 		/*
