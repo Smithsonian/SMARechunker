@@ -257,6 +257,8 @@ chunkSpec *newChunkList = NULL;
 
 float buffer[33000];
 int bufferPtr = 0;
+int sWARMOnlyTrack = FALSE;
+int sWARMOffset = 48;
 
 int isLegalN(int n) {
   return ((n == 1) || (n == 2) || (n == 4) || (n == 8) || (n == 16) || (n == 32) ||
@@ -266,6 +268,7 @@ int isLegalN(int n) {
 void printUsage(char *name) {
   printf("Usage:\n");
   printf("%s -i {input directory} -o {output directory} [-f {first scan number}] [-l {last scan number}] [-d] [-r {n} reduce all SWARM chunks by a factor of n}] {chunk spec} {chunk spec} ...\n", name);
+  printf("Use -S for a SWARM-only track\n");
   exit(0);
 }
 
@@ -303,7 +306,7 @@ int main (int argc, char **argv)
   sphDef oldSp, newSp;
   FILE *inFId, *outFId, *schInFId, *schOutFId;
 
-  while ((i = getopt(argc, argv, "di:f:l:o:r:")) != -1) {
+  while ((i = getopt(argc, argv, "di:f:l:o:r:S")) != -1) {
     switch (i) {
     case 'd':
       outputDefault = TRUE;
@@ -335,6 +338,10 @@ int main (int argc, char **argv)
 	exit(ERROR);
       }
       break;
+    case 'S':
+      sWARMOnlyTrack = TRUE;
+      sWARMOffset = 0;
+      break;
     default:
       printUsage(argv[0]);
     }
@@ -359,13 +366,13 @@ int main (int argc, char **argv)
 	  done = TRUE;
 	else if (!strcmp(oldCode.v_name, "band")) {
 	  bandCount++;
-	  if (oldCode.icode > 48)
+	  if (oldCode.icode > sWARMOffset)
 	    nSWARMChunks++;
 	}
       }
     } while ((nRead == sizeof(oldCode)) && !done);
     close(codeFId);
-    maxSWARMChunk = 48+nSWARMChunks;
+    maxSWARMChunk = sWARMOffset+nSWARMChunks;
     if (nSWARMChunks == 0) {
       fprintf(stderr, "No SWARM data seen in the input data directory - aborting\n");
       exit(ERROR);
@@ -386,7 +393,7 @@ int main (int argc, char **argv)
     justRegrid = FALSE;
   if (outputDefault) {
     /* Define two "new" chunks which are just the raw SWARM chunks without any changes */
-    for (i = 49; i <= maxSWARMChunk; i++) {
+    for (i = sWARMOffset+1; i <= maxSWARMChunk; i++) {
       newChunk = malloc(sizeof(*newChunk));
       if (newChunk == NULL) {
 	perror("newChunk malloc");
@@ -396,7 +403,7 @@ int main (int argc, char **argv)
       newChunk->startChan = 0;
       newChunk->endChan = 16383;
       newChunk->nAve = 1;
-      newChunk->iband = 49+newBandCounter++;
+      newChunk->iband = sWARMOffset+1+newBandCounter++;
       newChunk->next = NULL;
       if (newChunkList == NULL)
 	newChunkList = newChunk;
@@ -412,11 +419,11 @@ int main (int argc, char **argv)
 	perror("newChunk malloc");
 	exit(ERROR);
       }
-      newChunk->sourceChunk = 49+i;
+      newChunk->sourceChunk = sWARMOffset+1+i;
       newChunk->startChan = 0;
       newChunk->endChan = 16383;
       newChunk->nAve = globalAverage;
-      newChunk->iband = 49+newBandCounter++;
+      newChunk->iband = sWARMOffset+1+newBandCounter++;
       newChunk->next = NULL;
       if (newChunkList == NULL)
 	newChunkList = newChunk;
@@ -434,10 +441,10 @@ int main (int argc, char **argv)
 	fprintf(stderr, "Cannot parse chunk specification \"%s\"\n", argv[i+optind]);
 	exit(ERROR);
       }
-      if ((chunk < 49) || (chunk > maxSWARMChunk)) {
+      if ((chunk < sWARMOffset+1) || (chunk > maxSWARMChunk)) {
 	fprintf(stderr, "Error in new chunk spcification #%d\n", i+1);
-	fprintf(stderr, "\"%s\" is an invalid chunk specifier - input chunk (%d) must be between 49 and %d inclusive\n",
-		argv[i+optind], chunk, maxSWARMChunk);
+	fprintf(stderr, "\"%s\" is an invalid chunk specifier - input chunk (%d) must be between %d and %d inclusive\n",
+		argv[i+optind], chunk, sWARMOffset+1, maxSWARMChunk);
 	exit(ERROR);
       }
       if (!isLegalN(n)) {
@@ -480,7 +487,7 @@ int main (int argc, char **argv)
       newChunk->startChan = sChan;
       newChunk->endChan = eChan;
       newChunk->nAve = n;
-      newChunk->iband = 49+newBandCounter++;
+      newChunk->iband = sWARMOffset+1+newBandCounter++;
       newChunk->next = NULL;
       if (newChunkList == NULL)
 	newChunkList = newChunk;
@@ -811,7 +818,7 @@ int main (int argc, char **argv)
 	  lastInhid = oldSp.inhid;
 	}
 	found = FALSE;
-	if ((oldSp.iband >= 49) && (oldSp.iband <= maxSWARMChunk)) {
+	if ((oldSp.iband >= sWARMOffset+1) && (oldSp.iband <= maxSWARMChunk)) {
 	  int oldMin, oldMax, oldExp;
 	  float ratio;
 	  chunkSpec *ptr;
