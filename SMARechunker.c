@@ -257,8 +257,8 @@ chunkSpec *newChunkList = NULL;
 
 float buffer[33000];
 int bufferPtr = 0;
-int sWARMOnlyTrack = FALSE;
-int sWARMOffset = 48;
+int sWARMOnlyTrack = TRUE;
+int sWARMOffset = 0;
 
 int isLegalN(int n) {
   return ((n == 1) || (n == 2) || (n == 4) || (n == 8) || (n == 16) || (n == 32) ||
@@ -306,8 +306,12 @@ int main (int argc, char **argv)
   sphDef oldSp, newSp;
   FILE *inFId, *outFId, *schInFId, *schOutFId;
 
-  while ((i = getopt(argc, argv, "di:f:l:o:r:S")) != -1) {
+  while ((i = getopt(argc, argv, "Adi:f:l:o:r:S")) != -1) {
     switch (i) {
+    case 'A':
+      sWARMOnlyTrack = FALSE;
+      sWARMOffset = 48;
+      break;
     case 'd':
       outputDefault = TRUE;
       break;
@@ -339,6 +343,8 @@ int main (int argc, char **argv)
       }
       break;
     case 'S':
+      fprintf(stderr, "The -S switch is no longer needed, SWARM-only is the default\n");
+      fprintf(stderr, "Use -A if the track contains ASIC correlator data\n");
       sWARMOnlyTrack = TRUE;
       sWARMOffset = 0;
       break;
