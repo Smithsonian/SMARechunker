@@ -268,7 +268,7 @@ int isLegalN(int n) {
 void printUsage(char *name) {
   printf("Usage:\n");
   printf("%s -i {input directory} -o {output directory} [-f {first scan number}] [-l {last scan number}] [-d] [-r {n} reduce all SWARM chunks by a factor of n}] {chunk spec} {chunk spec} ...\n", name);
-  printf("Use -S for a SWARM-only track\n");
+  printf("Use -A for tracks which contain ASIC data\n");
   exit(0);
 }
 
