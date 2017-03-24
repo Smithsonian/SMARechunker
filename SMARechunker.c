@@ -269,6 +269,7 @@ void printUsage(char *name) {
   printf("Usage:\n");
   printf("%s -i {input directory} -o {output directory} [-f {first scan number}] [-l {last scan number}] [-d] [-r {n} reduce all SWARM chunks by a factor of n}] {chunk spec} {chunk spec} ...\n", name);
   printf("Use -A for tracks which contain ASIC data\n");
+  printf("Use -L to list the number of scans and chunks in the track\n");
   exit(0);
 }
 
@@ -279,7 +280,8 @@ int main (int argc, char **argv)
   int lastScanNumber = -1;
   int globalAverage = FALSE;
   int copyAllScans = TRUE;
-  int nRead, nSynth, justRegrid, eChan, sChan;
+  int nSynth = 0;
+  int nRead, justRegrid, eChan, sChan;
   int newBandCounter = 0;
   int lastInhid, schDataSize, codesInFId, codesOutFId;
   int outputDefault = FALSE;
@@ -293,6 +295,7 @@ int main (int argc, char **argv)
   int newSize;
   int outPtr = 0;
   int nSWARMChunks = 0;
+  int justList = FALSE;
   float invFactor;
   short *data = NULL;
   short *newData = NULL;
@@ -306,7 +309,7 @@ int main (int argc, char **argv)
   sphDef oldSp, newSp;
   FILE *inFId, *outFId, *schInFId, *schOutFId;
 
-  while ((i = getopt(argc, argv, "Adi:f:l:o:r:S")) != -1) {
+  while ((i = getopt(argc, argv, "Adi:f:l:Lo:r:S")) != -1) {
     switch (i) {
     case 'A':
       sWARMOnlyTrack = FALSE;
@@ -326,6 +329,9 @@ int main (int argc, char **argv)
     case 'l':
       lastScanNumber = atoi(optarg);
       copyAllScans = FALSE;
+      break;
+    case 'L':
+      justList = TRUE;
       break;
     case 'o':
       gotOutput = TRUE;
@@ -352,8 +358,63 @@ int main (int argc, char **argv)
       printUsage(argv[0]);
     }
   }
-  if (!gotInput || !gotOutput)
+  if (justList && (!gotInput)) {
+    fprintf(stderr, "You must specify an input data directory with the -i option\n");
+    exit(-1);
+  }
+  else if ((!gotInput || !gotOutput) && (!justList))
     printUsage(argv[0]);
+  if (justList) {
+    int nScans = 0;
+    int lastScanNo = -1;
+    int leadZero = 0;
+    int nPrinted = 0;
+    int i, nRead, chunkPresent[53], spFId;
+    sphDef spRec;
+
+    for (i = 0; i < 53; i++)
+      chunkPresent[i] = 0;
+
+    sprintf(fileName, "%s/sp_read", inDir);
+    spFId = open(fileName, O_RDONLY);
+    if (spFId < 0) {
+      perror("Open of sp_read");
+      exit(ERROR);
+    }
+    do {
+      nRead = read(spFId, &spRec, sizeof(spRec));
+      if (nRead == sizeof(spRec)) {
+	chunkPresent[spRec.iband] = 1;
+	if (spRec.iband > 9)
+	  leadZero = 1;
+	if ((lastScanNo < 0) || (lastScanNo != spRec.inhid)) {
+	  nScans++;
+	  lastScanNo = spRec.inhid;
+	}
+      }
+    } while (nRead == sizeof(spRec));
+    printf("The file has %d scans\n", nScans);
+    printf("and contains data for the following chunks:\n");
+    for (i = 0; i < 53; i++) {
+      if (chunkPresent[i]) {
+	if (i == 0)
+	  printf("c1\n");
+	else {
+	  if (leadZero)
+	    printf("s%02d ", i);
+	  else
+	    printf("s%d ", i);
+	  nPrinted++;
+	  if (nPrinted > 10) {
+	    printf("\n");
+	    nPrinted = 0;
+	  }
+	}
+      }
+    }
+    printf("\n");
+    exit(0);
+  }
   {
     int codeFId, done, bandCount;
 
