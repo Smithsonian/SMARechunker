@@ -929,7 +929,8 @@ int main (int argc, char **argv)
 	      tData = &data[1+oldPtr + 2*sChan];
 	      high = (eChan+1)/factor;
 	      bufferPtr = 0;
-	      outPtr += 2;
+	      if (factor != 1)
+		outPtr += 2;
 	      for (i = sChan/factor; i < high; i++) {
 		realIntSum = imagIntSum = 0;
 		/*
@@ -996,7 +997,7 @@ int main (int argc, char **argv)
 		ratio = 32767.0f/(float)oldMax;
 	      else
 		ratio = 1.0f;
-	      if (ratio >= 2.0f) {
+	      if ((ratio >= 2.0f) && (factor != 1)) {
 		int newExp, iscale;
 		float scale, scaleFactor;
 		
