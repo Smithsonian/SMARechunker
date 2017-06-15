@@ -277,7 +277,7 @@ int main (int argc, char **argv)
 {
   unsigned int i, j;
   int firstScanNumber = -1;
-  int lastScanNumber = -1;
+  int lastScanNumber = 100000000;
   int globalAverage = FALSE;
   int copyAllScans = TRUE;
   int nSynth = 0;
@@ -843,6 +843,7 @@ int main (int argc, char **argv)
 	    }
 	    fwrite_unlocked(&bigData[0], 1, outPtr*sizeof(short) + 2*sizeof(int), schOutFId);
 	  }
+	getData:
 	  schNRead = fread_unlocked(&header[0], 1, 2*sizeof(int), schInFId);
 	  if (schNRead != 2*sizeof(int)) {
 	    fprintf(stderr, "Only got %d bytes from sch_read - should have gotten %ld\n", schNRead, 2*sizeof(int));
@@ -855,8 +856,18 @@ int main (int argc, char **argv)
 	    exit(ERROR);
 	  }
 	  if (oldSp.inhid != header[0]) {
-	    fprintf(stderr, "sp thinks inhid is %d, sch thinks inhid = %d - abort\n", oldSp.inhid, header[0]);
-	    exit(ERROR);
+	    short *junk;
+
+	    /* fprintf(stderr, "sp thinks inhid is %d, sch thinks inhid = %d - abort\n", oldSp.inhid, header[0]); */
+	    printf("Skipping scan %d\n", header[0]);
+	    junk = (short *)malloc(schDataSize);
+	    if (junk == NULL) {
+	      perror("junk malloc");
+	      exit(ERROR);
+	    }
+	    fread_unlocked(junk, 1, schDataSize, schInFId);
+	    free(junk);
+	    goto getData;
 	  }
 	  if (data == NULL) {
 	    data = (short *)malloc(schDataSize);
@@ -940,8 +951,8 @@ int main (int argc, char **argv)
 		*/
 		switch (factor) {
 		case 1:
-		  realIntSum += *tData++;
-		  imagIntSum += *tData++;
+		  realIntSum = *tData++;
+		  imagIntSum = *tData++;
 		  break;
 		case 2:
 		  for (j = 0; j < 2; j++) {
@@ -1030,7 +1041,7 @@ int main (int argc, char **argv)
       } /* End of block executed if the scan number is in range for copying */
     } /* End of block executed if the correct number of bytes are read (in other words, not EOF) */
   } /* End of main while loop processing the data */
-  newHeader[1] = outPtr*sizeof(short);
+  /* newHeader[1] = outPtr*sizeof(short); */
   if (outPtr*sizeof(short) > newDataSize) {
     fprintf(stderr, "Output buffer overflow (2): max: %d, now: %d - abort\n", newDataSize, outPtr);
     exit(ERROR);
