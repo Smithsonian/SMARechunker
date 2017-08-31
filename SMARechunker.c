@@ -833,6 +833,7 @@ int main (int argc, char **argv)
 	  
 	  if ((oldSp.inhid % 100) == 0)
 	    printf("Processing scan: %d\n", oldSp.inhid);
+
 	  if (data != NULL) {
 	    /* Not the first record - need to write out last scan's data */
 	    
@@ -856,17 +857,11 @@ int main (int argc, char **argv)
 	    exit(ERROR);
 	  }
 	  if (oldSp.inhid != header[0]) {
-	    short *junk;
 
 	    /* fprintf(stderr, "sp thinks inhid is %d, sch thinks inhid = %d - abort\n", oldSp.inhid, header[0]); */
-	    printf("Skipping scan %d\n", header[0]);
-	    junk = (short *)malloc(schDataSize);
-	    if (junk == NULL) {
-	      perror("junk malloc");
-	      exit(ERROR);
-	    }
-	    fread_unlocked(junk, 1, schDataSize, schInFId);
-	    free(junk);
+	    if (!(header[0] % 100))
+	      printf("Skipping scan %d\n", header[0]);
+	    fseek(schInFId, schDataSize, SEEK_CUR);
 	    goto getData;
 	  }
 	  if (data == NULL) {
@@ -886,7 +881,8 @@ int main (int argc, char **argv)
 	  }
 	  newHeader[0] = header[0];
 	  newSize = outPtr = 0;
-	  
+
+	  /* printf("%d: Reading %d bytes\n", oldSp.inhid, schDataSize); */
 	  schNRead = fread_unlocked(data, 1, schDataSize, schInFId);
 	  if (schNRead != schDataSize) {
 	    fprintf(stderr, "Didn't get the data I needed from sch_read - wanted %d, got %d - abort\n",
