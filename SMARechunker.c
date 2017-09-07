@@ -596,7 +596,7 @@ int main (int argc, char **argv)
       exit(ERROR);
     }
     sprintf(fileName, "%s/bl_read", outDir);
-    blFDo = open(fileName, O_WRONLY|O_CREAT);
+    blFDo = open(fileName, O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR|S_IRGRP);
     if (blFDo < 0) {
       perror("Open output bl_read");
       exit(ERROR);
@@ -636,7 +636,7 @@ int main (int argc, char **argv)
       exit(ERROR);
     }
     sprintf(fileName, "%s/eng_read", outDir);
-    engFDo = open(fileName, O_WRONLY|O_CREAT);
+    engFDo = open(fileName, O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR|S_IRGRP);
     if (engFDo < 0) {
       perror("Open output eng_read");
       exit(ERROR);
@@ -668,7 +668,7 @@ int main (int argc, char **argv)
       exit(ERROR);
     }
     sprintf(fileName, "%s/in_read", outDir);
-    inFDo = open(fileName, O_WRONLY|O_CREAT);
+    inFDo = open(fileName, O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR|S_IRGRP);
     if (inFDo < 0) {
       perror("Open output in_read");
       exit(ERROR);
@@ -715,7 +715,7 @@ int main (int argc, char **argv)
       exit(ERROR);
     }
     sprintf(fileName, "%s/we_read", outDir);
-    weFDo = open(fileName, O_WRONLY|O_CREAT);
+    weFDo = open(fileName, O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR|S_IRGRP);
     if (weFDo < 0) {
       perror("Open output we_read");
       exit(ERROR);
@@ -747,7 +747,7 @@ int main (int argc, char **argv)
       exit(ERROR);
     }
     sprintf(fileName, "%s/codes_read", outDir);
-    codesOutFId = open(fileName, O_WRONLY|O_CREAT);
+    codesOutFId = open(fileName, O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR|S_IRGRP);
     if (codesOutFId < 0) {
       perror("Open of codes_read (new)");
       exit(ERROR);
