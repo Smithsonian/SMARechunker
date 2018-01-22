@@ -3,4 +3,4 @@ Stand-alone program to change the resolution and bandwidth of SWARM correlator c
 
 See
 
-http://sma1.sma.hawaii.edu/internal/wiki/page/view.html?name=Reducing%20the%20resolution%20of%20SWARM%20chunks
+https://www.cfa.harvard.edu/sma/SWARM/
