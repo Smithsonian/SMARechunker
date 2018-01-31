@@ -5,10 +5,12 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <ctype.h>
 #include <fcntl.h>
 
 #define TRUE  (1)
 #define FALSE (0)
+#define SUCCESS (0)
 #define ERROR (-1)
 #define UNINITIALIZED (-100)
 #define MAX_BASELINES (28)
@@ -137,6 +139,9 @@ typedef struct __attribute__((packed)) blhDef {
   double sparedbl6; /*                                                                           */
 } blhDef;
 /* the size of blhDef is 158 bytes */
+blhDef *savedIndex = NULL;
+int lowestIndex = 10000000;
+int highestIndex = -100000000;
 
 typedef struct __attribute__((packed)) antEngDef {
   int antennaNumber;
@@ -255,6 +260,31 @@ typedef struct chunkSpec {
 
 chunkSpec *newChunkList = NULL;
 
+#define USB (1)
+#define LSB (0)
+#define DSB (10)
+
+#define RXA (1)
+#define RXB (2)
+
+typedef struct despikeSpec {
+  int ant1;     /* 0 = all */
+  int ant2;     /* 0 = all */
+  int rx;
+  int sb;       /* Sideband */
+  int chunk;    /* 0 = all */
+  int spike1;
+  int spike2;
+  int left1;
+  int left2;
+  int right1;
+  int right2;
+  struct despikeSpec *next;
+} despikeSpec;
+
+despikeSpec *despikeList = NULL;
+despikeSpec *lastSpike = NULL;
+
 float buffer[33000];
 int bufferPtr = 0;
 int sWARMOnlyTrack = TRUE;
@@ -265,11 +295,279 @@ int isLegalN(int n) {
 	  (n == 64) || (n == 128) || (n == 256) || (n == 512) || (n == 1024));
 }
 
+void printDespikeList(void)
+{
+  int i = 1;
+  despikeSpec *ptr;
+
+  ptr = despikeList;
+  while (ptr != NULL) {
+    printf("Spike entry %d:\n", i++);
+    printf("baseline %d-%d, rx = %d, sb = %d, chunk = %d\n", ptr->ant1, ptr->ant2, ptr->rx, ptr->sb, ptr->chunk);
+    printf("left side %d->%d, spike %d->%d, right side %d->%d\n", ptr->left1, ptr->left2,
+	   ptr->spike1, ptr->spike2, ptr->right1, ptr->right2);
+    ptr = ptr->next;
+  }
+}
+
+void printDespikeSyntax(void)
+{
+  fprintf(stderr, "The syntax for despike specifications is:\n");
+  fprintf(stderr, "-D 'a1-a2:rx:sb:chunk:spike1-spike2:left1-left2:right1-right2'\n");
+  fprintf(stderr, "Where\n");
+  fprintf(stderr, "  a1     = antenna 1 (* = all)\n");
+  fprintf(stderr, "  a2     = antenna 2 (* = all)\n");
+  fprintf(stderr, "  rx     = sideband (A or B)\n");
+  fprintf(stderr, "  sb     = sideband (u, l, or b)\n");
+  fprintf(stderr, "  chunk  = 1, 2, 3 or 4\n");
+  fprintf(stderr, "  spike1 = low channel number of spike\n");
+  fprintf(stderr, "  spike2 = high channel number of spike\n");
+  fprintf(stderr, "  left1  = low channel of left side for fit\n");
+  fprintf(stderr, "  left2  = high channel of left side for fit\n");
+  fprintf(stderr, "  right1 = low channel of right side for fit\n");
+  fprintf(stderr, "  right2 = high channel of right side for fit\n");
+}
+
+#define LOOKING_FOR_A1     (0)
+#define LOOKING_FOR_A2     (1)
+#define LOOKING_FOR_RX     (2)
+#define LOOKING_FOR_SB     (3)
+#define LOOKING_FOR_CHUNK  (4)
+#define LOOKING_FOR_SPIKE1 (5)
+#define LOOKING_FOR_SPIKE2 (6)
+#define LOOKING_FOR_LEFT1  (7)
+#define LOOKING_FOR_LEFT2  (8)
+#define LOOKING_FOR_RIGHT1 (9)
+#define LOOKING_FOR_RIGHT2 (10)
+#define PARSE_DONE         (11)
+
+int parseDespike(char *arg) {
+  int state = LOOKING_FOR_A1;
+  int i, n = -100, length, ant1 = -1, ant2 = -1, sideband = -2, chunk = -1, rx = -1,
+    spike1 = -1, spike2 = -1, left1 = -1, left2 = -1, right1 = -1, right2 = -1;
+  char *ptr = NULL;
+
+  length = strlen(arg);
+  for (i = 0; (i < length) && (state != PARSE_DONE); i++) {
+    switch (state) {
+    case LOOKING_FOR_A1:
+      if (arg[i] == '*') {
+	ant1 = 0;
+	if (i >= length)
+	  return ERROR;
+	else if (arg[i+1] != '-') {
+	  fprintf(stderr, "Baseline spec does not have a dash between the antennas - aborting\n");
+	  return ERROR;
+	} else {
+	  i++;
+	  state = LOOKING_FOR_A2;
+	}
+      } else if (('1' <= arg[i]) && (arg[i] <= '9')) {
+	ant1 = atoi(&arg[i]);
+	if (i >= length)
+	  return ERROR;
+	else if (arg[i+1] != '-') {
+	  fprintf(stderr, "Baseline spec does not have a dash between the antennas - aborting\n");
+	  return ERROR;
+	} else {
+	  i++;
+	  state = LOOKING_FOR_A2;
+	}
+      } else {
+	fprintf(stderr, "Illegal specification (\"%c\") for antenna 1 in despike string \"%s\" - aborting\n", arg[i], arg);
+	return ERROR;
+      }
+      break;
+    case LOOKING_FOR_A2:
+      if (arg[i] == '*') {
+	ant2 = 0;
+	if (i >= length)
+	  return ERROR;
+	else if (arg[i+1] != ':') {
+	  fprintf(stderr, "Baseline spec not separated from Rx spec by a : - aborting\n");
+	  return ERROR;
+	} else {
+	  i++;
+	  state = LOOKING_FOR_RX;
+	}
+      } else if (('1' <= arg[i]) && (arg[i] <= '9')) {
+	ant2 = atoi(&arg[i]);
+	if (i >= length)
+	  return ERROR;
+	else if (arg[i+1] != ':') {
+	  fprintf(stderr, "Baseline spec not separated from Rx spec by a : - aborting\n");
+	  return ERROR;
+	} else {
+	  i++;
+	  state = LOOKING_FOR_RX;
+	}
+      } else {
+	fprintf(stderr, "Illegal specification (\"%c\") for antenna 2 in despike string \"%s\" - aborting\n", arg[i], arg);
+	return ERROR;
+      }
+      break;
+    case LOOKING_FOR_RX:
+      arg[i] = tolower(arg[i]);
+      if ((arg[i] == 'a') || (arg[i] == 'b')) {
+	switch (arg[i]) {
+	case 'a':
+	  rx = RXA;
+	  break;
+	default:
+	  rx = RXB;
+	}
+	if (i >= length)
+	  return ERROR;
+	else if (arg[i+1] != ':') {
+	  fprintf(stderr, "Rx spec not separated from sideband spec by : - aborting\n");
+	  return ERROR;
+	} else {
+	  i++;
+	  state = LOOKING_FOR_SB;
+	}
+      } else {
+	fprintf(stderr, "Illegal Rx specification (%c) must be A or B (case ignored) - aborting\n", arg[i]);
+	return ERROR;
+      }
+      break;
+    case LOOKING_FOR_SB:
+      arg[i] = tolower(arg[i]);
+      if ((arg[i] == 'l') || (arg[i] == 'b') || (arg[i] == 'u')) {
+	switch (arg[i]) {
+	case 'l':
+	  sideband = LSB;
+	  break;
+	case 'b':
+	  sideband = DSB;
+	  break;
+	default:
+	  sideband = USB;
+	}
+	if (i >= length)
+	  return ERROR;
+	else if (arg[i+1] != ':') {
+	  fprintf(stderr, "sideband spec not separated from chunk spec by a colon - aborting\n");
+	  return ERROR;
+	} else {
+	  i++;
+	  state = LOOKING_FOR_CHUNK;
+	}
+      } else {
+	fprintf(stderr, "Illegal sideband spec (%c), must be l, u or b (case ignored) - aborting\n", arg[i]);
+	return ERROR;
+      }
+      break;
+    case LOOKING_FOR_CHUNK:
+      if (('1' <= arg[i]) && (arg[i] <= '4')) {
+	chunk = atoi(&arg[i]);
+	if (i >= length)
+	  return ERROR;
+	else if (arg[i+1] != ':') {
+	  fprintf(stderr, "Chunk spec not separated from the spike spec by a : - aborting\n");
+	  return ERROR;
+	} else {
+	  i++;
+	  state = LOOKING_FOR_SPIKE1;
+	}
+      } else {
+	fprintf(stderr, "Illegal chunk specification (%c), must be 1, 2, 3 or 4\n", arg[i]);
+	return ERROR;
+      }
+      break;
+    case LOOKING_FOR_SPIKE1:
+    case LOOKING_FOR_SPIKE2:
+    case LOOKING_FOR_LEFT1:
+    case LOOKING_FOR_LEFT2:
+    case LOOKING_FOR_RIGHT1:
+    case LOOKING_FOR_RIGHT2:
+      n = strtol(&arg[i], &ptr, 10);
+      if ((0 > n) || (n > 16383)) {
+	fprintf(stderr, "Illegal channel number (%d) - must be between 0 and 16383 inclusive - aborting\n", n);
+	return ERROR;
+      }
+      switch (state) {
+      case LOOKING_FOR_SPIKE1:
+	if (n > 16382)
+	  return ERROR;
+	spike1 = n;
+	break;
+      case LOOKING_FOR_SPIKE2:
+	if ((n > 16382) || (n < spike1))
+	  return ERROR;
+	spike2 = n;
+	break;
+      case LOOKING_FOR_LEFT1:
+	if (n > 16381)
+	  return ERROR;
+	left1  = n;
+	break;
+      case LOOKING_FOR_LEFT2:
+	if ((n > 16381) || (n < left1))
+	  return ERROR;
+	left2  = n;
+	break;
+      case LOOKING_FOR_RIGHT1:
+	right1 = n;
+	break;
+      case LOOKING_FOR_RIGHT2:
+	if (n < right1)
+	  return ERROR;
+	right2 = n;
+	break;
+      }
+      i += (int)(ptr-&arg[i])-1;
+      state += 1;
+      if (state < PARSE_DONE) {
+	if (i >= length)
+	  return ERROR;
+	else if (((arg[i+1] != ':') && (state % 2)) || ((arg[i+1] != '-') && !(state % 2)))
+	  return ERROR;
+      }
+      i++;
+      break;
+    default:
+      fprintf(stderr, "Despike parse error, i = %d\n", i);
+      exit(ERROR);
+    }
+  }
+  /* printf("Loop exit: i: %d len: %d state: %d PARSE_DONE: %d\n", i, length, state, PARSE_DONE); */
+  if ((state == PARSE_DONE) && (i == (length+1))) {
+    despikeSpec *newSpike;
+
+    newSpike = (despikeSpec *)malloc(sizeof(despikeSpec));
+    if (newSpike == NULL) {
+      perror("malloc for new despikeSpec");
+      exit(ERROR);
+    }
+    newSpike->next   = NULL;
+    newSpike->ant1   = ant1;
+    newSpike->ant2   = ant2;
+    newSpike->rx     = rx;
+    newSpike->sb     = sideband;
+    newSpike->chunk  = chunk;
+    newSpike->spike1 = spike1;
+    newSpike->spike2 = spike2;
+    newSpike->left1  = left1;
+    newSpike->left2  = left2;
+    newSpike->right1 = right1;
+    newSpike->right2 = right2;
+    if (despikeList == NULL)
+      despikeList = newSpike;
+    else
+      lastSpike->next = newSpike;
+    lastSpike = newSpike;
+    /* printDespikeList(); */
+    return SUCCESS;
+  } else
+    return ERROR;
+}
+
 void printUsage(char *name) {
   printf("Usage:\n");
   printf("%s -i {input directory} -o {output directory} [-f {first scan number}] [-l {last scan number}] [-d] [-r {n} reduce all SWARM chunks by a factor of n}] {chunk spec} {chunk spec} ...\n", name);
   printf("Use -A for tracks which contain ASIC data\n");
   printf("Use -L to list the number of scans and chunks in the track\n");
+  printf("Use -D 'ant1-ant2:rx:chunk:spikeLo-spikeHi:leftLo-leftHi:rightLo:rightHi' to despike (can be used more than once)\n");
   exit(0);
 }
 
@@ -302,6 +600,7 @@ int main (int argc, char **argv)
   short *bigData = NULL;
   char *inDir = NULL;
   char *outDir = NULL;
+  char *despikeArg = NULL;
   char shellCommand[1000], fileName[1000];
   chunkSpec *newChunk = NULL;
   chunkSpec *lastChunk = NULL;
@@ -309,7 +608,7 @@ int main (int argc, char **argv)
   sphDef oldSp, newSp;
   FILE *inFId, *outFId, *schInFId, *schOutFId;
 
-  while ((i = getopt(argc, argv, "Adi:f:l:Lo:r:S")) != -1) {
+  while ((i = getopt(argc, argv, "AdD:i:f:l:Lo:r:S")) != -1) {
     switch (i) {
     case 'A':
       sWARMOnlyTrack = FALSE;
@@ -317,6 +616,14 @@ int main (int argc, char **argv)
       break;
     case 'd':
       outputDefault = TRUE;
+      break;
+    case 'D':
+      despikeArg = optarg;
+      if (parseDespike(despikeArg) != SUCCESS) {
+	printDespikeSyntax();
+	exit(0);
+      }
+      /* printf("\"%s\" despike string parsed successfully\n", optarg); */
       break;
     case 'i':
       gotInput = TRUE;
@@ -364,6 +671,49 @@ int main (int argc, char **argv)
   }
   else if ((!gotInput || !gotOutput) && (!justList))
     printUsage(argv[0]);
+  /*
+    If we're going to do despiking, we have to save a table of the in_read entries, so that
+    we can later use the inhid from the sp_read entries to determine things like antenna numbers
+    which are not saved in the sp_read entries.
+   */
+  if (despikeList != NULL) {
+    int nRead, spFId;
+    sphDef spRec;
+    int blFDi;
+    char fileName[100];
+    blhDef blh;
+
+    sprintf(fileName, "%s/sp_read", inDir);
+    spFId = open(fileName, O_RDONLY);
+    if (spFId < 0) {
+      perror("Open of sp_read");
+      exit(ERROR);
+    }
+    do {
+      nRead = read(spFId, &spRec, sizeof(spRec));
+      if (spRec.blhid < lowestIndex)
+	lowestIndex = spRec.blhid;
+      if (spRec.blhid > highestIndex)
+	highestIndex = spRec.blhid;
+    } while (nRead == sizeof(spRec));
+    savedIndex = (blhDef *)malloc((1 + highestIndex-lowestIndex)*sizeof(blhDef));
+    if (savedIndex == NULL) {
+      perror("mallocing for savedIndex");
+      exit(ERROR);
+    }
+    sprintf(fileName, "%s/bl_read", inDir);
+    blFDi = open(fileName, O_RDONLY);
+    if (blFDi < 0) {
+      perror("Open input bl_read");
+      exit(ERROR);
+    }
+    do {
+      nRead = read(blFDi, &blh, sizeof(blh));
+      if (nRead == sizeof(blh))
+	memcpy(&savedIndex[blh.blhid-lowestIndex], &blh, sizeof(blhDef));
+    } while (nRead == sizeof(blh));
+    close(blFDi);
+  }
   if (justList) {
     int nScans = 0;
     int lastScanNo = -1;
@@ -414,7 +764,7 @@ int main (int argc, char **argv)
     }
     printf("\n");
     exit(0);
-  }
+  } /* End of "justList" option */
   {
     int codeFId, done, bandCount;
 
@@ -904,13 +1254,14 @@ int main (int argc, char **argv)
 	      unsigned int high, oldPtr, savedPtr;
 	      int realIntSum, imagIntSum;
 	      short *tData;
+	      despikeSpec *dPtr;
 	      
 	      found = TRUE;
 	      sChan = ptr->startChan;
 	      eChan = ptr->endChan;
 	      factor = ptr->nAve;
 	      invFactor = 1.0/((float)factor);
-	      
+ 
 	      /* Regrid the chunk! */
 	      
 	      oldPtr = oldSp.dataoff/2;
@@ -938,6 +1289,52 @@ int main (int argc, char **argv)
 	      bufferPtr = 0;
 	      if (factor != 1)
 		outPtr += 2;
+              /* Handle despiking, if specified */
+	      dPtr = despikeList;
+	      /*
+	      printf("%d-%d %d %d %d \n", 
+		     savedIndex[oldSp.blhid - lowestIndex].iant1,
+		     savedIndex[oldSp.blhid - lowestIndex].iant2,
+		     savedIndex[oldSp.blhid - lowestIndex].irec,
+		     savedIndex[oldSp.blhid - lowestIndex].isb,
+		      oldSp.iband
+		     );
+	      */
+	      while (dPtr != NULL) {
+		float rightReal, spikeReal, leftReal;
+		float rightImag, spikeImag, leftImag;
+
+		/* printf("\t %d-%d %d %d %d\n", dPtr->ant1, dPtr->ant2, dPtr->rx, dPtr->sb, dPtr->chunk); */
+		if (   ((dPtr->ant1 == 0) || (dPtr->ant1 == savedIndex[oldSp.blhid - lowestIndex].iant1))
+		    && ((dPtr->ant2 == 0) || (dPtr->ant2 == savedIndex[oldSp.blhid - lowestIndex].iant2))
+		    && (((dPtr->rx == RXA) && (savedIndex[oldSp.blhid - lowestIndex].irec < 3))
+			|| ((dPtr->rx == RXB) && (savedIndex[oldSp.blhid - lowestIndex].irec > 2)))
+		    && ((dPtr->sb == DSB) || (dPtr->sb == savedIndex[oldSp.blhid - lowestIndex].isb))
+		    && (dPtr->chunk == oldSp.iband)) {
+		  /* printf("Found one to despike\n"); */
+		  rightReal = leftReal = rightImag = leftImag = 0.0;
+		  for (i = dPtr->left1; i <= dPtr->left2; i++) {
+		    leftReal = (float)tData[2*i];
+		    leftImag = (float)tData[2*i+1];
+		  }
+		  leftReal /= (float)(1 + dPtr->left2 - dPtr->left1);
+		  leftImag /= (float)(1 + dPtr->left2 - dPtr->left1);
+		  for (i = dPtr->right1; i <= dPtr->right2; i++) {
+		    rightReal = (float)tData[2*i];
+		    rightImag = (float)tData[2*i+1];
+		  }
+		  rightReal /= (float)(1 + dPtr->right2 - dPtr->right1);
+		  rightImag /= (float)(1 + dPtr->right2 - dPtr->right1);
+		  for (i = dPtr->spike1; i <= dPtr->spike2; i++) {
+		    spikeReal = (leftReal + rightReal)/2.0;
+		    spikeImag = (leftImag + rightImag)/2.0;
+		    tData[2*i    ] = (short)(spikeReal + 0.5);
+		    tData[2*i + 1] = (short)(spikeImag + 0.5);
+		  }
+		}
+		dPtr = dPtr->next;
+	      }
+
 	      for (i = sChan/factor; i < high; i++) {
 		realIntSum = imagIntSum = 0;
 		/*
